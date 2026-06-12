@@ -87,6 +87,10 @@ button{font-family:inherit}
 }
 
 /* ===== 地图元素 ===== */
+/* 势力范围块（维诺图疆域涂色） */
+.tcell{stroke:#0b1018;stroke-width:1.2;stroke-opacity:.3;transition:fill .4s}
+body.light .tcell{stroke:#8a7d5f;stroke-opacity:.4}
+svg.no-tcell .tcell{display:none}
 .edge{stroke:#46566f;stroke-width:2.5;opacity:.6;stroke-dasharray:2 7;stroke-linecap:round}
 .edge.r{stroke:#4a7fae;opacity:.75}
 .edge.m{stroke:#8a7a55;opacity:.7}
@@ -710,7 +714,37 @@ function loadSave(){
 /* =================== 地图渲染 =================== */
 const svg=$('#map-svg');
 const NS='http://www.w3.org/2000/svg';
-let cityRefs=[];
+let cityRefs=[],cellRefs=[];
+/* ---- 势力范围：以城池为心划分疆域（维诺图 + 海岸裁剪） ---- */
+const LAND_CLIP=[[30,18],[300,0],[620,0],[830,26],[858,80],[874,228],[914,342],[902,470],
+  [950,588],[926,792],[858,838],[600,812],[300,788],[110,726],[26,560],[12,256]];
+function clipHalf(poly,nx,ny,mx,my){
+  const out=[];
+  for(let k=0;k<poly.length;k++){
+    const a=poly[k],b=poly[(k+1)%poly.length];
+    const da=(a[0]-mx)*nx+(a[1]-my)*ny;
+    const db=(b[0]-mx)*nx+(b[1]-my)*ny;
+    if(da<=0)out.push(a);
+    if((da<0&&db>0)||(da>0&&db<0)){
+      const t=da/(da-db);
+      out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);
+    }
+  }
+  return out;
+}
+function computeCells(){
+  const sites=CITY_DEFS.map(d=>[d[1],d[2]]);
+  return sites.map((s,i)=>{
+    let poly=LAND_CLIP;
+    for(let j=0;j<sites.length;j++){
+      if(j===i)continue;
+      const o=sites[j];
+      poly=clipHalf(poly,o[0]-s[0],o[1]-s[1],(o[0]+s[0])/2,(o[1]+s[1])/2);
+      if(poly.length<3)return [];
+    }
+    return poly;
+  });
+}
 let vb={x:70,y:-10,w:860,h:784};
 /* 标注反向缩放（地图 App 式）：图标文字在屏幕上保持近似恒定大小 */
 const BASE_VW=1000;
@@ -943,6 +977,16 @@ function buildMap(){
   svg.innerHTML='';
   applyVB();
   buildTerrain();
+  // 势力范围块（疆域涂色）
+  cellRefs=[];
+  const cellG=svgEl('g',{});
+  computeCells().forEach((poly,i)=>{
+    if(poly.length<3){cellRefs.push(null);return;}
+    const p=svgEl('path',{class:'tcell',d:'M '+poly.map(pt=>pt[0].toFixed(1)+','+pt[1].toFixed(1)).join(' L ')+' Z'});
+    cellG.appendChild(p);cellRefs.push(p);
+  });
+  svg.appendChild(cellG);
+  if(store.get('sgbh_tcell')==='0')svg.classList.add('no-tcell');
   // 商路（边）+ 地形徽章
   const eg=svgEl('g',{});
   EDGES.forEach(e=>{
@@ -1001,6 +1045,11 @@ function renderMap(){
     const r=cityRefs[i];
     if(!r)return;
     r.body.setAttribute('fill',FACTS[c.owner].color);
+    const cell=cellRefs[i];
+    if(cell){
+      cell.setAttribute('fill',FACTS[c.owner].color);
+      cell.setAttribute('fill-opacity',c.owner==='neutral'?0.06:0.16);
+    }
     r.fch.textContent=FACTS[c.owner].name;
     r.troops.textContent=fmtT(c.troops);
     r.cstats.textContent=`农${c.farm} 商${c.comm} 防${c.wall}`;
@@ -1920,6 +1969,7 @@ function checkRank(){
 function showGameMenu(){
   const m=modal(`<h3>☰ 菜单</h3>
     <button class="btn wide" id="gm-theme"><span>${document.body.classList.contains('light')?'🌙 配色：水墨纸卷':'🌑 配色：夜色玄黑'}</span></button>
+    <button class="btn wide" id="gm-tcell"><span>${svg.classList.contains('no-tcell')?'🗺 势力涂色：关':'🗺 势力涂色：开'}</span></button>
     <button class="btn wide" id="gm-sound"><span>${Sound.on?'🔊 音效：开':'🔇 音效：关'}</span></button>
     <button class="btn wide" id="gm-help"><span>📜 玩法说明</span></button>
     <button class="btn wide atk" id="gm-restart"><span>🔄 放弃本局，重新开始</span></button>
@@ -1928,6 +1978,12 @@ function showGameMenu(){
     const light=document.body.classList.toggle('light');
     store.set('sgbh_theme',light?'light':'dark');
     e.currentTarget.querySelector('span').textContent=light?'🌙 配色：水墨纸卷':'🌑 配色：夜色玄黑';
+    Sound.play('tap');
+  };
+  m.querySelector('#gm-tcell').onclick=e=>{
+    const off=svg.classList.toggle('no-tcell');
+    store.set('sgbh_tcell',off?'0':'1');
+    e.currentTarget.querySelector('span').textContent=off?'🗺 势力涂色：关':'🗺 势力涂色：开';
     Sound.play('tap');
   };
   m.querySelector('#gm-sound').onclick=e=>{
