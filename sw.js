@@ -1,7 +1,9 @@
 // 三国·烽火天下 离线缓存
 // 策略：HTML 联网优先（在线即更新，离线用缓存）；静态资源缓存优先
-const CACHE = 'sgbh-v2';
-const ASSETS = ['./', './index.html', './manifest.json', './icon.png'];
+const CACHE = 'sgbh-v3';
+const ASSETS = ['./', './index.html', './manifest.json', './icon.png',
+  './css/style.css',
+  './js/data.js', './js/core.js', './js/map.js', './js/ui.js', './js/ai.js', './js/main.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
