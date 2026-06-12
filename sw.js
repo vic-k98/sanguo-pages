@@ -1,5 +1,6 @@
-// 三国·烽火天下 离线缓存（机上模式专用）
-const CACHE = 'sgbh-v1';
+// 三国·烽火天下 离线缓存
+// 策略：HTML 联网优先（在线即更新，离线用缓存）；静态资源缓存优先
+const CACHE = 'sgbh-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
@@ -14,16 +15,29 @@ self.addEventListener('activate', e => {
   );
 });
 
-// 缓存优先：离线时完全从本地读取
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(hit => hit ||
+  const isHTML = e.request.mode === 'navigate' ||
+    (e.request.headers.get('accept') || '').includes('text/html');
+  if (isHTML) {
+    // 联网优先：拿到新版立即更新缓存；断网（机上模式）回退缓存
+    e.respondWith(
       fetch(e.request).then(resp => {
         const cp = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, cp));
+        caches.open(CACHE).then(c => c.put('./index.html', cp));
         return resp;
       }).catch(() => caches.match('./index.html'))
-    )
-  );
+    );
+  } else {
+    // 静态资源：缓存优先
+    e.respondWith(
+      caches.match(e.request, { ignoreSearch: true }).then(hit => hit ||
+        fetch(e.request).then(resp => {
+          const cp = resp.clone();
+          caches.open(CACHE).then(c => c.put(e.request, cp));
+          return resp;
+        })
+      )
+    );
+  }
 });
