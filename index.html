@@ -28,6 +28,8 @@ button{font-family:inherit}
   align-items:center;justify-content:center;gap:14px;padding:24px;
   background:radial-gradient(ellipse 90% 60% at 50% 18%,#1d2c47 0%,#0b1018 70%);
 }
+#screen-setup{justify-content:flex-start;gap:10px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-top:max(22px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}
 #screen-menu h1{font-size:clamp(28px,8vw,46px);margin:0;letter-spacing:clamp(4px,1.8vw,10px);color:#e8c96a;text-shadow:0 2px 18px #e8c96a44;white-space:nowrap}
 #screen-menu .sub{font-size:14px;letter-spacing:6px;opacity:.6;margin-bottom:28px}
 .menu-btn{
@@ -105,6 +107,7 @@ svg.far .troops,svg.far .ticon{opacity:0;transition:opacity .3s}
 .gline{font-size:10.5px;fill:#cdbce8;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:3}
 .ctag{font-size:10px;fill:#b9a978;text-anchor:middle;font-family:"Songti SC","KaiTi",serif;paint-order:stroke;stroke:#0b1018;stroke-width:2.5}
 .mtn-label{font-size:12.5px;fill:rgba(138,151,173,.8);text-anchor:middle;font-family:"Songti SC","KaiTi",serif;letter-spacing:2px}
+.mtn-label.yue{fill:rgba(190,165,100,.85)}
 .landmark{font-size:11.5px;fill:rgba(200,168,106,.88);text-anchor:middle;font-family:"Songti SC","KaiTi",serif;paint-order:stroke;stroke:#0b1018;stroke-width:2.5}
 .ebadge-label{font-size:9px;fill:#8fa3c4;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:2}
 .river-w{fill:none;stroke:#1d3a5c;stroke-width:13;opacity:.85;stroke-linecap:round}
@@ -280,6 +283,24 @@ g.city.small .ticon{font-size:12px}
       <button data-d="0.75">简单</button><button data-d="1" class="sel">普通</button><button data-d="1.35">困难</button>
     </div>
   </div>
+  <div class="setup-row">
+    <span>国力</span>
+    <div class="seg" id="wealth-seg">
+      <button data-w="0.5">贫瘠</button><button data-w="1" class="sel">标准</button><button data-w="2.5">富庶</button>
+    </div>
+  </div>
+  <div class="setup-row">
+    <span>史话</span>
+    <div class="seg" id="hist-seg">
+      <button data-h="1" class="sel">史实演进</button><button data-h="0">架空乱世</button>
+    </div>
+  </div>
+  <div class="setup-row">
+    <span>群雄</span>
+    <div class="seg" id="neu-seg">
+      <button data-n="0.6">羸弱</button><button data-n="1" class="sel">标准</button><button data-n="1.5">精锐</button>
+    </div>
+  </div>
   <button class="menu-btn primary" id="btn-start" style="margin-top:8px">出 师 ！</button>
   <button class="menu-btn" id="btn-back" style="padding:10px;font-size:14px;width:auto;min-width:140px">返回</button>
 </div>
@@ -321,7 +342,7 @@ const store={
   set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},
   del(k){try{localStorage.removeItem(k)}catch(e){}}
 };
-const SAVE_KEY='sgbh_save_v4';
+const SAVE_KEY='sgbh_save_v5';
 
 /* =================== 音效 =================== */
 const Sound={
@@ -360,10 +381,14 @@ const FACTS={
   wei:{name:'魏',leader:'曹操',color:'#4f8fe8',desc:'雄踞中原，兵多将广，四通八达，攻守兼备。'},
   shu:{name:'蜀',leader:'刘备',color:'#3fae5a',desc:'坐拥天府之国，名将如云，蜀道天险易守难攻。'},
   wu:{name:'吴',leader:'孙权',color:'#e0564f',desc:'据长江之险，江东子弟多才俊，徐图天下。'},
-  yuan:{name:'袁',leader:'袁绍',color:'#a06ae0',desc:'河北之地粮草丰足，然四面受敌，挑战极大。'},
+  yuan:{name:'袁',leader:'袁绍',color:'#a06ae0',desc:'河北粮足兵广，然官渡阴云将至，挑战极大。'},
+  biao:{name:'荆',leader:'刘表',color:'#3fb3a8',desc:'坐拥荆襄沃土三城，水陆要冲，保境则安。'},
+  teng:{name:'凉',leader:'马腾',color:'#d2954a',desc:'西凉铁骑天下无双，携子马超虎踞关西。'},
+  zan:{name:'燕',leader:'公孙瓒',color:'#5fc8e8',desc:'幽燕白马义从，威震塞北，南向以争天下。'},
+  bu:{name:'吕',leader:'吕布',color:'#c94f8e',desc:'人中吕布！仅据下邳一城，唯凭武勇搏出生路。'},
   neutral:{name:'群',leader:'群雄',color:'#7d8590',desc:''}
 };
-const MAJORS=['wei','shu','wu','yuan'];
+const MAJORS=['wei','shu','wu','yuan','biao','teng','zan','bu'];
 /* 城池地域特性 */
 const TRAITS={
   gran:{icon:'🌾',name:'粮仓',desc:'粮产 +40%'},
@@ -376,30 +401,30 @@ const TRAITS={
 };
 // [名,x,y,势力,兵力,农,商,城防,都城,特性,风物志]
 const CITY_DEFS=[
-  ['西凉',110,215,'neutral',8000,2,2,2,0,'horse','凉州大马，纵横天下'],
-  ['长安',300,305,'neutral',12000,3,3,3,0,'trade','八百里秦川，西都故地'],
+  ['西凉',110,215,'teng',10000,2,2,2,1,'horse','凉州大马，纵横天下'],
+  ['长安',300,305,'teng',12000,3,3,3,0,'trade','八百里秦川，西都故地'],
   ['汉中',285,445,'shu',9000,3,3,3,0,'fort','秦岭巍巍，蜀道咽喉'],
   ['成都',150,545,'shu',16000,5,4,3,1,'gran','沃野千里，天府之国'],
   ['永安',315,565,'shu',9000,3,3,2,0,'fort','白帝高城，锁钥三峡'],
   ['晋阳',480,160,'yuan',8000,3,3,2,0,'fort','表里山河，北方重镇'],
   ['洛阳',468,318,'wei',10000,3,4,3,0,'trade','九州腹地，天下之中'],
   ['宛',468,428,'neutral',9000,3,3,2,0,'trade','商遍天下，富冠海内'],
-  ['襄阳',487,512,'neutral',11000,3,3,3,0,'fort','铁打襄阳，荆襄锁钥'],
-  ['江陵',452,598,'neutral',10000,3,3,2,0,'gran','两湖膏腴，鱼米之乡'],
+  ['襄阳',487,512,'biao',11000,3,3,3,1,'fort','铁打襄阳，荆襄锁钥'],
+  ['江陵',452,598,'biao',10000,3,3,2,0,'gran','两湖膏腴，鱼米之乡'],
   ['武陵',432,692,'neutral',6000,2,2,1,0,'wild','五溪深处，民风剽悍'],
   ['长沙',565,668,'neutral',9000,3,3,2,0,'gran','湘水之滨，禾稼丰登'],
-  ['蓟',622,78,'yuan',8000,3,2,2,0,'horse','幽燕之地，多悲歌之士'],
+  ['蓟',622,78,'zan',8000,3,2,2,0,'horse','幽燕之地，多悲歌之士'],
   ['邺',585,212,'yuan',15000,4,4,3,1,'gran','漳水之畔，河北粮仓'],
   ['陈留',595,320,'wei',9000,3,3,2,0,'trade','中原通衢，四战之地'],
   ['许昌',578,398,'wei',16000,4,4,3,1,'trade','奉天子以令不臣'],
-  ['江夏',605,532,'neutral',9000,3,3,2,0,'port','江夏水寨，扼控大江'],
+  ['江夏',605,532,'biao',9000,3,3,2,0,'port','江夏水寨，扼控大江'],
   ['平原',695,188,'yuan',8000,3,3,2,0,'gran','青州沃野，禾稼如云'],
   ['濮阳',668,278,'wei',9000,3,3,2,0,'trade','黄河古渡，卫地商埠'],
   ['寿春',718,412,'neutral',10000,3,3,2,0,'gran','淮南膏腴，江淮屏障'],
   ['柴桑',695,578,'wu',9000,3,3,2,0,'port','水军大寨，楼船千艘'],
-  ['北平',765,72,'neutral',7000,2,2,2,0,'horse','白马义从，威震塞北'],
+  ['北平',765,72,'zan',9000,2,2,2,1,'horse','白马义从，威震塞北'],
   ['北海',815,218,'neutral',7000,3,3,2,0,'trade','孔孟遗风，文教之乡'],
-  ['下邳',795,322,'neutral',10000,3,3,2,0,'fort','徐州坚城，兵家必争'],
+  ['下邳',795,322,'bu',12000,3,3,2,1,'fort','徐州坚城，兵家必争'],
   ['建业',832,472,'wu',15000,4,4,3,1,'trade','虎踞龙盘，江东都会'],
   ['吴',902,545,'wu',8000,3,3,2,0,'port','三江五湖，舟楫之利'],
   ['会稽',882,645,'neutral',6000,2,3,1,0,'wild','山越杂处，东南海陬'],
@@ -428,19 +453,27 @@ const PERSONA={
   shu:{label:'仁主 · 蓄势制衡',atk:1.28,rec:22000,wallMax:6,neu:1.25},
   wu:{label:'守成 · 待时而动',atk:1.4,rec:20000,wallMax:5,neu:1.4},
   yuan:{label:'世家 · 广积粮草',atk:1.38,rec:18000,wallMax:5,neu:1.2},
+  biao:{label:'坐谈 · 保境安民',atk:1.5,rec:18000,wallMax:6,neu:1.3},
+  teng:{label:'铁骑 · 剽悍善战',atk:1.26,rec:18000,wallMax:4,neu:1.2},
+  zan:{label:'白马 · 锐气善攻',atk:1.3,rec:18000,wallMax:4,neu:1.25},
+  bu:{label:'飞将 · 有勇无谋',atk:1.22,rec:22000,wallMax:3,neu:1.1},
 };
 // [名,统率,武力,势力,驻城]
 const GEN_DEFS=[
   ['曹操',92,72,'wei',15],['张辽',94,92,'wei',15],['许褚',88,96,'wei',15],['司马懿',93,63,'wei',14],
   ['夏侯惇',90,89,'wei',14],['曹仁',89,86,'wei',6],['徐晃',87,88,'wei',18],['张郃',88,89,'wei',18],
   ['刘备',82,73,'shu',3],['诸葛亮',98,55,'shu',3],['赵云',96,96,'shu',3],['张飞',95,98,'shu',2],
-  ['黄忠',90,93,'shu',2],['马超',94,97,'shu',2],['关羽',97,97,'shu',4],['魏延',87,90,'shu',4],
+  ['黄忠',90,93,'shu',2],['关羽',97,97,'shu',4],['魏延',87,90,'shu',4],
   ['孙权',80,67,'wu',24],['陆逊',95,69,'wu',24],['程普',82,79,'wu',24],['周瑜',96,71,'wu',20],
   ['吕蒙',92,81,'wu',20],['甘宁',91,94,'wu',20],['太史慈',90,93,'wu',25],['黄盖',84,83,'wu',25],
   ['袁绍',78,70,'yuan',13],['颜良',88,93,'yuan',13],['淳于琼',72,65,'yuan',13],['文丑',87,92,'yuan',17],
-  ['鞠义',84,80,'yuan',5],['高览',80,83,'yuan',12],
+  ['鞠义',84,80,'yuan',5],['高览',80,83,'yuan',13],
+  ['刘表',72,55,'biao',8],['文聘',85,84,'biao',8],['蔡瑁',75,70,'biao',9],['黄祖',70,72,'biao',16],
+  ['马腾',80,88,'teng',0],['马超',94,97,'teng',0],['庞德',88,94,'teng',1],['韩遂',76,74,'teng',1],
+  ['公孙瓒',82,85,'zan',21],['田豫',80,70,'zan',21],['严纲',72,75,'zan',12],
+  ['吕布',95,100,'bu',23],['陈宫',83,60,'bu',23],['高顺',86,87,'bu',23],
 ];
-const POOL_DEFS=[['庞统',94,40],['徐庶',89,61],['姜维',92,89],['邓艾',91,85],['陆抗',88,71],['高顺',86,87],
+const POOL_DEFS=[['庞统',94,40],['徐庶',89,61],['姜维',92,89],['邓艾',91,85],['陆抗',88,71],
   ['张任',84,82],['华雄',83,90],['周泰',87,91],['王平',82,77],['马岱',81,85],['严颜',80,81]];
 /* 官衔体系：领土晋位，将军号授封 */
 const RANKS=[{c:0,name:'太守',inc:0},{c:6,name:'州牧',inc:.05},{c:10,name:'大将军',inc:.10},{c:14,name:'丞相',inc:.15},{c:19,name:'天子',inc:.20}];
@@ -492,9 +525,12 @@ const HISTORY=[
   {id:'chibi',y:208,s:3,title:'赤壁之火',cond:()=>F('wei').alive&&F('wu').alive,
    text:'东风骤起，黄盖诈降，火船直入北军水寨。樯橹灰飞烟灭，曹军折戟长江。（魏各城兵力 -14%，吴获金）',
    fx:()=>{nerfCities('wei',0.86);F('wu').gold+=1000}},
-  {id:'machao',y:211,s:0,title:'马超兴兵',cond:()=>C(0).owner==='neutral',
-   text:'马超、韩遂尽起西凉之众，铁骑十万，兵锋直指关中。（西凉守军大增）',
-   fx:()=>{C(0).troops=Math.min(TROOP_CAP,C(0).troops+6000)}},
+  {id:'biaodeath',y:208,s:1,title:'刘表病逝',cond:()=>F('biao').alive,
+   text:'刘表病卒于襄阳，蔡瑁张允废长立幼，荆州文武各怀去就，人心离散。（荆州势力受挫）',
+   fx:()=>{F('biao').gold=Math.max(0,F('biao').gold-300);nerfCities('biao',0.88)}},
+  {id:'machao',y:211,s:0,title:'马超兴兵',cond:()=>F('teng').alive,
+   text:'马超尽起羌胡之众，西凉铁骑十万，剽悍天下闻名。（凉州各城兵势大振）',
+   fx:()=>{cityIdsOf('teng').slice(0,2).forEach(i=>{const c=C(i);c.troops=Math.min(TROOP_CAP,c.troops+3000);c.tired+=3000})}},
   {id:'locust',y:214,s:2,title:'蝗灾蔽日',cond:()=>true,
    text:'飞蝗蔽天，禾稼食尽，谷一斛五十万钱。是岁天下大饥。（各势力存粮 -30%）',
    fx:()=>{MAJORS.forEach(f=>{if(F(f).alive)F(f).food=Math.floor(F(f).food*0.7)})}},
@@ -551,17 +587,19 @@ const CHOICES=[
 /* =================== 游戏状态 =================== */
 let state=null,selected=-1,busy=false;
 
-function newGame(playerFid,diff){
+function newGame(playerFid,diff,opts){
+  opts=Object.assign({wealth:1,hist:true,neu:1},opts||{});
   state={
-    v:4,player:playerFid,diff:diff,turn:1,year:200,season:0,won:false,fired:[],
+    v:5,player:playerFid,diff:diff,turn:1,year:200,season:0,won:false,fired:[],opts:opts,
     factions:{},log:[],
-    cities:CITY_DEFS.map(d=>({name:d[0],x:d[1],y:d[2],owner:d[3],troops:d[4],
+    cities:CITY_DEFS.map(d=>({name:d[0],x:d[1],y:d[2],owner:d[3],
+      troops:d[3]==='neutral'?Math.round(d[4]*opts.neu):d[4],
       farm:d[5],comm:d[6],wall:d[7],cap:d[8],trait:d[9],tag:d[10],tired:0,devUsed:false,recUsed:false})),
     generals:GEN_DEFS.map((g,i)=>({id:i,name:g[0],war:g[1],wu:g[2],fid:g[3],city:g[4],title:null})),
     pool:POOL_DEFS.map((g,i)=>({id:100+i,name:g[0],war:g[1],wu:g[2]})),
     rkLast:0,
   };
-  MAJORS.forEach(f=>{state.factions[f]={gold:2000,food:2500,alive:true}});
+  MAJORS.forEach(f=>{state.factions[f]={gold:Math.round(2000*opts.wealth),food:Math.round(2500*opts.wealth),alive:true}});
   addLog(`${FACTS[playerFid].leader}举义兵于${capOf(playerFid)}，大业自此始！`);
 }
 function capOf(fid){const c=state.cities.find(c=>c.owner===fid&&c.cap);return c?c.name:'';}
@@ -590,7 +628,7 @@ function save(){
 function loadSave(){
   const s=store.get(SAVE_KEY);
   if(!s)return false;
-  try{const o=JSON.parse(s);if(o&&o.v===4&&o.cities&&o.cities.length===CITY_DEFS.length){state=o;return true}}catch(e){}
+  try{const o=JSON.parse(s);if(o&&o.v===5&&o.cities&&o.cities.length===CITY_DEFS.length){state=o;return true}}catch(e){}
   return false;
 }
 
@@ -764,11 +802,44 @@ function buildTerrain(){
     g.appendChild(svgEl('line',{class:'tree-t',x1:0,y1:3,x2:0,y2:-2}));
     svg.appendChild(g);
   });
+  // ---- 长城：万里雄关锁塞北 ----
+  svg.appendChild(svgEl('path',{d:'M 130,78 C 260,40 420,22 560,26 C 660,29 760,42 858,72',
+    fill:'none',stroke:'#8a7355','stroke-width':3,'stroke-dasharray':'9 5',opacity:.6,'stroke-linecap':'round'}));
+  [[180,62],[300,36],[430,23],[560,26],[680,31],[790,49]].forEach(p=>{
+    svg.appendChild(svgEl('rect',{x:p[0]-3.5,y:p[1]-5.5,width:7,height:10,fill:'#8a7355',opacity:.75,rx:1}));
+  });
+  svg.appendChild(svgText('mtn-label',478,12,'长　城',{fill:'rgba(160,138,100,.7)','font-size':'14'}));
+  // ---- 草原毡帐 / 丝路驼队 ----
+  [[250,-95],[610,-122],[850,-88]].forEach(p=>{
+    const g=svgEl('g',{transform:`translate(${p[0]},${p[1]})`,opacity:.55});
+    g.appendChild(svgEl('path',{d:'M -11,0 a11,8 0 0 1 22,0 Z',fill:'#4a5a44',stroke:'#6a7a5a','stroke-width':1.2}));
+    g.appendChild(svgEl('line',{x1:0,y1:-8,x2:0,y2:-14,stroke:'#8a7355','stroke-width':1.2}));
+    svg.appendChild(g);
+  });
+  const camel1=svgText('',-150,212,'🐫',{'font-size':'16',opacity:'.55','text-anchor':'middle'});svg.appendChild(camel1);
+  const camel2=svgText('',-215,238,'🐫',{'font-size':'12',opacity:'.45','text-anchor':'middle'});svg.appendChild(camel2);
+  // ---- 蓬莱仙岛（渤海之外）----
+  svg.appendChild(svgEl('ellipse',{cx:1062,cy:152,rx:20,ry:8,fill:'#1d2c44',stroke:'#3a577c','stroke-width':1.5,opacity:.9}));
+  svg.appendChild(svgEl('path',{class:'mtn2',d:'M 1054,150 L 1060,140 L 1066,150',opacity:.8}));
+  svg.appendChild(svgText('sea-label',1062,134,'蓬莱',{'font-size':'12','text-anchor':'middle'}));
+  // ---- 农田阡陌（粮仓城郊，放大可见）----
+  [3,9,11,13,17,19].forEach(ci=>{
+    const c=CITY_DEFS[ci];
+    const g=svgEl('g',{class:'lod-near',transform:`translate(${c[1]-54},${c[2]+2})`,opacity:.55});
+    for(let r=0;r<3;r++)g.appendChild(svgEl('line',{x1:0,y1:r*6,x2:20,y2:r*6,stroke:'#6a7a4a','stroke-width':1.1}));
+    for(let q=0;q<3;q++)g.appendChild(svgEl('line',{x1:q*10,y1:-2,x2:q*10,y2:14,stroke:'#6a7a4a','stroke-width':1.1}));
+    svg.appendChild(g);
+  });
   // ---- 放大可见：山脉名（定点标注，屏幕恒定大小）----
   [['祁连山',175,188],['阴山',420,70],['燕山',688,64],['太行山',548,268],
    ['秦岭',300,402],['巴山',252,538],['巫山',378,572],['大别山',655,492],
    ['南岭',645,788],['武夷山',822,764],['陇山',105,356]].forEach(m=>{
     const t=svgEl('text',{class:'mtn-label lod-near zoom-pt','data-zx':m[1],'data-zy':m[2],transform:`translate(${m[1]},${m[2]})`});
+    t.textContent=m[0];svg.appendChild(t);
+  });
+  // 五岳（金色名山）
+  [['🏔 恒山',505,118],['🏔 华山',350,345],['🏔 嵩山',505,362],['🏔 泰山',758,246],['🏔 衡山',545,726]].forEach(m=>{
+    const t=svgEl('text',{class:'mtn-label yue lod-near zoom-pt','data-zx':m[1],'data-zy':m[2],transform:`translate(${m[1]},${m[2]})`});
     t.textContent=m[0];svg.appendChild(t);
   });
   // ---- 放大可见：古迹与古战场 ----
@@ -1361,8 +1432,9 @@ function aiTurn(fid,reports){
   }
 }
 function neutralRegen(){
+  const cap=Math.round(14000*(state.opts?state.opts.neu:1));
   state.cities.forEach(c=>{
-    if(c.owner==='neutral'&&c.troops<14000)c.troops=Math.min(14000,c.troops+250);
+    if(c.owner==='neutral'&&c.troops<cap)c.troops=Math.min(cap,c.troops+250);
   });
 }
 function incomeAll(){
@@ -1411,6 +1483,7 @@ function advanceTime(){
   state.cities.forEach(c=>{c.tired=0;c.devUsed=false;c.recUsed=false;});
 }
 function checkHistory(){
+  if(state.opts&&!state.opts.hist)return []; // 架空乱世：历史不再重演
   const fired=[];
   HISTORY.forEach(h=>{
     if(state.fired.includes(h.id))return;
@@ -1550,7 +1623,8 @@ function showLog(){
 }
 function showHelp(){
   modal(`<h3>📜 玩法说明</h3><div class="helpbox">
-  <b>🎯 胜利</b>：占领 ${WIN_CITIES} 座城池，或消灭魏蜀吴袁中其余势力。若有强敌先据 22 城一统天下，则大势已去。<br>
+  <b>🎯 胜利</b>：占领 ${WIN_CITIES} 座城池，或消灭其余七路诸侯（魏蜀吴袁·荆凉燕吕）。若有强敌先据 ${AI_WIN} 城一统天下，则大势已去。<br>
+  <b>🎛 自定义开局</b>：可调难度、起始国力（贫瘠/富庶）、史话开关（架空乱世则历史不再重演）、群雄守军强度。<br>
   <b>🏯 内政</b>：每城每回合可执行一次开发（劝农/通商/筑城）与一次征兵。商业产金、农业产粮，秋季丰收粮产翻倍，冬季出征攻方 -10%。<br>
   <b>🗺 地利</b>：每城各有特性——🌾粮仓 💰商都 🛡️雄关 🐎马场 ⛵水港 🏹蛮地，影响产出、征兵与战力，地图上城池头顶可见。<br>
   <b>⛰ 山河</b>：道路上的 🌊 表示渡河（攻方 -15%，⛵水港出兵不受影响），⛰ 表示山道（攻方 -12%）。据河山而守，事半功倍。<br>
@@ -1730,14 +1804,14 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('show'));
   $(id).classList.add('show');
 }
-let setupFid='shu',setupDiff=1;
+let setupFid='shu',setupDiff=1,setupWealth=1,setupHist=true,setupNeu=1;
 function buildSetup(){
   const wrap=$('#fact-cards');
   wrap.innerHTML='';
   MAJORS.forEach(fid=>{
     const fd=FACTS[fid];
     const nCities=CITY_DEFS.filter(d=>d[3]===fid).length;
-    const topGens=GEN_DEFS.filter(g=>g[2]===fid).sort((a,b)=>b[1]-a[1]).slice(0,3).map(g=>g[0]).join('、');
+    const topGens=GEN_DEFS.filter(g=>g[3]===fid).sort((a,b)=>b[1]-a[1]).slice(0,3).map(g=>g[0]).join('、');
     const card=document.createElement('div');
     card.className='fcard'+(fid===setupFid?' sel':'');
     card.style.setProperty('--fc',fd.color);
@@ -1753,12 +1827,18 @@ function buildSetup(){
     wrap.appendChild(card);
   });
 }
-$('#diff-seg').addEventListener('click',e=>{
-  const b=e.target.closest('button');if(!b)return;
-  setupDiff=+b.dataset.d;Sound.play('tap');
-  $('#diff-seg').querySelectorAll('button').forEach(x=>x.classList.remove('sel'));
-  b.classList.add('sel');
-});
+function bindSeg(id,fn){
+  $(id).addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    fn(b);Sound.play('tap');
+    $(id).querySelectorAll('button').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+  });
+}
+bindSeg('#diff-seg',b=>setupDiff=+b.dataset.d);
+bindSeg('#wealth-seg',b=>setupWealth=+b.dataset.w);
+bindSeg('#hist-seg',b=>setupHist=b.dataset.h==='1');
+bindSeg('#neu-seg',b=>setupNeu=+b.dataset.n);
 function startGame(){
   showScreen('#screen-game');
   vb={x:-95,y:-110,w:1190,h:1085};
@@ -1769,7 +1849,7 @@ $('#btn-new').onclick=()=>{Sound.play('tap');buildSetup();showScreen('#screen-se
 $('#btn-back').onclick=()=>{Sound.play('tap');showScreen('#screen-menu');};
 $('#btn-start').onclick=()=>{
   Sound.play('turn');
-  newGame(setupFid,setupDiff);
+  newGame(setupFid,setupDiff,{wealth:setupWealth,hist:setupHist,neu:setupNeu});
   save();
   startGame();
   setTimeout(()=>{toast(`${SEASON_EMO[0]} ${FACTS[setupFid].leader}据${capOf(setupFid)}而起，点击城池开始经营！`)},400);
