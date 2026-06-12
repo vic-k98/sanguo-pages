@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0b1018">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=9">
 <title>三国·烽火天下</title>
 </head>
 <body>
@@ -28,28 +28,31 @@
   <h2 class="serif">择 主 而 事</h2>
   <div style="font-size:12px;opacity:.5;margin-bottom:6px">公元 200 年，群雄并起，天下三分之势未成</div>
   <div id="fact-cards"></div>
-  <div class="setup-row" style="margin-top:8px">
-    <span>难度</span>
-    <div class="seg" id="diff-seg">
-      <button data-d="0.75">简单</button><button data-d="1" class="sel">普通</button><button data-d="1.35">困难</button>
+  <div id="fact-detail"></div>
+  <div id="opt-grid" style="margin-top:6px">
+    <div class="setup-row">
+      <span>难度</span>
+      <div class="seg" id="diff-seg">
+        <button data-d="0.75">简单</button><button data-d="1" class="sel">普通</button><button data-d="1.35">困难</button>
+      </div>
     </div>
-  </div>
-  <div class="setup-row">
-    <span>国力</span>
-    <div class="seg" id="wealth-seg">
-      <button data-w="0.5">贫瘠</button><button data-w="1" class="sel">标准</button><button data-w="2.5">富庶</button>
+    <div class="setup-row">
+      <span>国力</span>
+      <div class="seg" id="wealth-seg">
+        <button data-w="0.5">贫瘠</button><button data-w="1" class="sel">标准</button><button data-w="2.5">富庶</button>
+      </div>
     </div>
-  </div>
-  <div class="setup-row">
-    <span>史话</span>
-    <div class="seg" id="hist-seg">
-      <button data-h="1" class="sel">史实演进</button><button data-h="0">架空乱世</button>
+    <div class="setup-row">
+      <span>史话</span>
+      <div class="seg" id="hist-seg">
+        <button data-h="1" class="sel">史实</button><button data-h="0">架空</button>
+      </div>
     </div>
-  </div>
-  <div class="setup-row">
-    <span>群雄</span>
-    <div class="seg" id="neu-seg">
-      <button data-n="0.6">羸弱</button><button data-n="1" class="sel">标准</button><button data-n="1.5">精锐</button>
+    <div class="setup-row">
+      <span>群雄</span>
+      <div class="seg" id="neu-seg">
+        <button data-n="0.6">羸弱</button><button data-n="1" class="sel">标准</button><button data-n="1.5">精锐</button>
+      </div>
     </div>
   </div>
   <button class="menu-btn primary" id="btn-start" style="margin-top:8px">出 师 ！</button>
@@ -72,6 +75,7 @@
     <button class="icon-btn" id="btn-log" title="战报日志">📜</button>
     <button class="icon-btn" id="btn-help" title="说明">❓</button>
     <button class="icon-btn" id="btn-gmenu" title="菜单">☰</button>
+    <div id="powerbar"></div>
   </div>
   <button id="btn-endturn">结束回合 ▶</button>
   <div id="panel"></div>
@@ -81,11 +85,11 @@
 <div id="modal-root"></div>
 <div id="toasts"></div>
 
-<script src="js/data.js?v=8"></script>
-<script src="js/core.js?v=8"></script>
-<script src="js/map.js?v=8"></script>
-<script src="js/ui.js?v=8"></script>
-<script src="js/ai.js?v=8"></script>
-<script src="js/main.js?v=8"></script>
+<script src="js/data.js?v=9"></script>
+<script src="js/core.js?v=9"></script>
+<script src="js/map.js?v=9"></script>
+<script src="js/ui.js?v=9"></script>
+<script src="js/ai.js?v=9"></script>
+<script src="js/main.js?v=9"></script>
 </body>
 </html>

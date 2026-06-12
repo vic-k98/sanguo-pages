@@ -4,7 +4,7 @@
  * ============================================================ */
 const svg=$('#map-svg');
 const NS='http://www.w3.org/2000/svg';
-let cityRefs=[],cellRefs=[];
+let cityRefs=[],cellRefs=[],edgeRefs={},hlEdges=[];
 let vb={x:30,y:-30,w:920,h:839};
 const BASE_VW=1000;
 const MINW=230,MAXW=1070;
@@ -99,6 +99,38 @@ function buildTerrain(){
   svg.appendChild(defs);
   svg.appendChild(svgEl('rect',{class:'land-base',x:-3000,y:-3000,width:8000,height:7600,fill:'#141e2e'}));
   svg.appendChild(svgEl('rect',{class:'land-glow',x:-100,y:-110,width:1200,height:1140,fill:'url(#landGlow)'}));
+  // ---- 写实地势色阶（仿地形图分层设色）----
+  [ // [path, fill, opacity]  平原偏绿 · 高原偏黄褐 · 盆地深绿 · 丘陵黄绿
+   ['M 330,60 L 560,88 L 562,258 L 430,300 L 332,222 Z','#5a4a32',.26],          // 黄土高原
+   ['M 560,140 L 845,178 L 878,330 L 700,352 L 580,330 Z','#2e4a36',.22],        // 华北平原
+   ['M 120,455 L 295,440 L 330,560 L 230,625 L 120,580 Z','#27442c',.32],        // 四川盆地
+   ['M 430,540 L 840,462 L 900,556 L 640,640 L 470,628 Z','#2e4a36',.2],         // 江汉平原·长江中下游
+   ['M 545,655 L 880,565 L 905,718 L 620,782 Z','#4a482e',.2],                   // 江南丘陵
+   ['M 140,705 L 355,718 L 388,832 L 230,872 L 130,815 Z','#4a4232',.26],        // 云贵高原
+   ['M 600,40 L 830,30 L 905,95 L 760,120 L 615,90 Z','#46422e',.18],            // 燕北丘陵
+  ].forEach(z=>{
+    svg.appendChild(svgEl('path',{class:'relief',d:z[0],fill:z[1],opacity:z[2]}));
+  });
+  // ---- 连绵山脉带（三层笔触：阴影/山体/亮脊）----
+  const RIDGES=[
+   ['M 510,108 C 528,158 542,210 556,262',16],                   // 太行山
+   ['M 218,392 C 292,378 362,386 432,400',18],                   // 秦岭
+   ['M 58,118 C 110,150 162,180 215,202',14],                    // 祁连山
+   ['M 250,468 C 310,486 372,498 420,506',13],                   // 大巴山
+   ['M 358,540 C 378,566 390,592 386,618',12],                   // 巫山
+   ['M 608,468 C 650,478 692,490 722,478',11],                   // 大别山
+   ['M 438,812 C 530,790 632,792 722,812',16],                   // 南岭
+   ['M 778,690 C 810,722 838,752 852,792',12],                   // 武夷山
+   ['M 598,54 C 660,46 722,50 782,62',12],                       // 燕山
+   ['M 328,54 C 390,42 452,40 506,50',12],                       // 阴山
+   ['M 95,300 C 110,340 122,380 140,415',12],                    // 陇山
+   ['M 160,420 C 200,440 235,452 255,460',10],                   // 祁山
+  ];
+  RIDGES.forEach(r=>{
+    svg.appendChild(svgEl('path',{class:'ridge-sh',d:r[0],'stroke-width':r[1]+3,transform:'translate(1.5,3)'}));
+    svg.appendChild(svgEl('path',{class:'ridge',d:r[0],'stroke-width':r[1]}));
+    svg.appendChild(svgEl('path',{class:'ridge-hi',d:r[0],'stroke-width':Math.max(3,r[1]*0.3),transform:'translate(-1,-2.5)'}));
+  });
   svg.appendChild(svgEl('ellipse',{cx:480,cy:-180,rx:950,ry:230,fill:'url(#steppe)'}));
   svg.appendChild(svgEl('ellipse',{cx:-220,cy:60,rx:420,ry:300,fill:'url(#desert)'}));
   svg.appendChild(svgEl('ellipse',{cx:-200,cy:520,rx:330,ry:340,fill:'url(#plateau)'}));
@@ -262,13 +294,17 @@ function buildMap(){
   buildTerrain();
   cellRefs=[];
   const cellG=svgEl('g',{});
-  // 中点二次贝塞尔平滑：疆界圆润如水墨晕染
+  // 小切角圆滑：疆界既圆润又相互贴合（只在角点做 22% 切角）
+  const T=0.22;
   const smoothPath=pts=>{
     const n=pts.length;
-    let d='M '+((pts[0][0]+pts[n-1][0])/2).toFixed(1)+','+((pts[0][1]+pts[n-1][1])/2).toFixed(1);
+    const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+    let d='';
     for(let i=0;i<n;i++){
-      const p=pts[i],q=pts[(i+1)%n];
-      d+=` Q ${p[0].toFixed(1)},${p[1].toFixed(1)} ${((p[0]+q[0])/2).toFixed(1)},${((p[1]+q[1])/2).toFixed(1)}`;
+      const prev=pts[(i-1+n)%n],p=pts[i],next=pts[(i+1)%n];
+      const a=lerp(p,prev,T),b=lerp(p,next,T);
+      d+=(i===0?`M ${a[0].toFixed(1)},${a[1].toFixed(1)}`:` L ${a[0].toFixed(1)},${a[1].toFixed(1)}`)
+        +` Q ${p[0].toFixed(1)},${p[1].toFixed(1)} ${b[0].toFixed(1)},${b[1].toFixed(1)}`;
     }
     return d+' Z';
   };
@@ -280,9 +316,12 @@ function buildMap(){
   svg.appendChild(cellG);
   if(store.get('sgbh_tcell')==='0')svg.classList.add('no-tcell');
   const eg=svgEl('g',{});
+  edgeRefs={};
   EDGES.forEach(e=>{
     const a=e[0],b=e[1],t=e[2];
-    eg.appendChild(svgEl('line',{class:'edge'+(t!=='p'?' '+t:''),x1:C(a).x,y1:C(a).y,x2:C(b).x,y2:C(b).y}));
+    const ln=svgEl('line',{class:'edge'+(t!=='p'?' '+t:''),x1:C(a).x,y1:C(a).y,x2:C(b).x,y2:C(b).y});
+    edgeRefs[Math.min(a,b)+'-'+Math.max(a,b)]=ln;
+    eg.appendChild(ln);
     if(t!=='p'){
       const mx=(C(a).x+C(b).x)/2,my=(C(a).y+C(b).y)/2;
       const bg=svgEl('g',{transform:`translate(${mx},${my})`});
@@ -349,9 +388,15 @@ function renderMap(){
     r.gline.textContent=gg.length?gg.slice(0,3).map(x=>x.name).join(' ')+(gg.length>3?` 等${gg.length}将`:''):'';
     r.g.classList.remove('sel','atk','mov');
   });
+  hlEdges.forEach(el=>el.classList.remove('hl'));
+  hlEdges=[];
   if(selected>=0){
     const sc=C(selected);
     cityRefs[selected].g.classList.add('sel');
+    ADJ[selected].forEach(n=>{
+      const el=edgeRefs[Math.min(selected,n)+'-'+Math.max(selected,n)];
+      if(el){el.classList.add('hl');hlEdges.push(el);}
+    });
     if(sc.owner===myFid){
       ADJ[selected].forEach(n=>{
         cityRefs[n].g.classList.add(C(n).owner===myFid?'mov':'atk');
@@ -374,13 +419,17 @@ function animateMarch(from,to,color,cb){
   const dot=svgEl('circle',{r:11,fill:color,stroke:'#fff','stroke-width':2.5});
   layer.appendChild(dot);
   Sound.play('march');
+  let done=false;
+  const finish=()=>{if(done)return;done=true;dot.remove();cb&&cb();};
   const t0=performance.now(),dur=620;
   (function step(t){
+    if(done)return;
     const p=Math.min(1,(t-t0)/dur),e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
     dot.setAttribute('cx',a.x+(b.x-a.x)*e);
     dot.setAttribute('cy',a.y+(b.y-a.y)*e-Math.sin(p*Math.PI)*18);
-    if(p<1)requestAnimationFrame(step);else{dot.remove();cb&&cb();}
+    if(p<1)requestAnimationFrame(step);else finish();
   })(t0);
+  setTimeout(finish,dur+350); // 兜底：任何环境下动画停滞也不会卡死回合
 }
 
 /* ============ 手势 ============ */

@@ -316,3 +316,48 @@ body.light .frame{stroke:#9a8e72}
 .cincome{font-size:10px;fill:#a8c29a;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:2.5}
 body.light .cincome{fill:#5a7048;stroke:#f0ead7}
 .tcell{stroke-linejoin:round;stroke-linecap:round}
+/* ===== v9：面板内嵌控件 ===== */
+.inline-box{margin-top:8px;padding:10px 12px;border-radius:12px;background:#101828;border:1px solid #2e3c58}
+body.light .inline-box{background:#f0ead7;border-color:#cfc4a6}
+.qbtns .go{flex:1.4;background:linear-gradient(#d9b455,#9a7a28);border-color:#e8c96a;color:#221a06;font-weight:700}
+/* 选中城道路高亮 */
+.edge.hl{opacity:1;stroke:#e8c96a;stroke-width:3.5;stroke-dasharray:none}
+body.light .edge.hl{stroke:#a07f2c}
+/* 写实地形 */
+.relief{pointer-events:none}
+.ridge{fill:none;stroke:#2b3349;opacity:.6;stroke-linecap:round}
+.ridge-sh{fill:none;stroke:#070b14;opacity:.35;stroke-linecap:round}
+.ridge-hi{fill:none;stroke:#7a8cad;opacity:.4;stroke-linecap:round}
+body.light .ridge{stroke:#b3a487;opacity:.75}
+body.light .ridge-sh{stroke:#8a7d5f;opacity:.3}
+body.light .ridge-hi{stroke:#f4eedd;opacity:.85}
+body.light .relief{opacity:.5!important}
+svg .mtn{opacity:.4}svg .mtn2{opacity:.3}
+/* 势力概览条（信息聚合，无弹窗） */
+#powerbar{
+  flex-basis:100%;display:flex;gap:4px;align-items:center;
+  padding:2px 0 0;overflow-x:auto;scrollbar-width:none;font-size:11px;
+}
+#powerbar::-webkit-scrollbar{display:none}
+.pb-item{
+  flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;
+  background:#16213366;cursor:pointer;white-space:nowrap;touch-action:manipulation;border:1px solid transparent;
+}
+.pb-item:active{transform:scale(.95)}
+.pb-item i{display:inline-block;height:7px;border-radius:4px;min-width:7px}
+.pb-item.me{border-color:#caa64b88}
+
+body.light .pb-item{background:#fffaf0aa}
+/* 紧凑开局 */
+#fact-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;width:min(94vw,560px)}
+.fcard{padding:9px 4px;text-align:center}
+.fcard .fname{font-size:16px}
+.fcard .fmini{font-size:10.5px;opacity:.65;margin-top:2px}
+#fact-detail{
+  width:min(94vw,560px);min-height:74px;margin-top:2px;padding:9px 12px;border-radius:12px;
+  background:#141c2b;border:1px solid #2c3a55;font-size:12px;line-height:1.65;
+}
+body.light #fact-detail{background:#f4eedd;border-color:#cfc4a6}
+#opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;width:min(94vw,560px)}
+#opt-grid .setup-row{margin:0;justify-content:space-between}
+#opt-grid .seg button{padding:8px 10px;font-size:13px}

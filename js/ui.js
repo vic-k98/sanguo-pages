@@ -26,9 +26,34 @@ function renderTopbar(){
   $('#tb-gold').textContent='💰 '+fmtG(f.gold);
   $('#tb-food').textContent='🌾 '+fmtG(f.food);
   $('#tb-city').textContent=`🏯 ${cityIdsOf(state.player).length}/${WIN_CITIES}`;
+  renderPowerbar();
 }
+/* 势力概览条：信息聚合，点击聚焦该势力并弹概况（无弹窗） */
+function renderPowerbar(){
+  const pb=$('#powerbar');
+  if(!pb||!state)return;
+  const rows=MAJORS.filter(f=>F(f).alive&&cityIdsOf(f).length>0)
+    .map(f=>({f,n:cityIdsOf(f).length})).sort((a,b)=>b.n-a.n);
+  pb.innerHTML=rows.map(r=>`<span class="pb-item${r.f===state.player?' me':''}" data-pf="${r.f}">
+    <i style="background:${FACTS[r.f].color};width:${6+r.n*3}px"></i>${FACTS[r.f].name}${r.n}${truceLeft(r.f)>0&&r.f!==state.player?'🤝':''}</span>`).join('')
+    +`<span class="pb-item" style="cursor:default;opacity:.55"><i style="background:#7d8590;width:${6+cityIdsOf('neutral').length*2}px"></i>群${cityIdsOf('neutral').length}</span>`;
+}
+$('#powerbar').addEventListener('click',e=>{
+  const b=e.target.closest('[data-pf]');
+  if(!b||!state)return;
+  const f=b.dataset.pf;
+  const ids=cityIdsOf(f);
+  if(!ids.length)return;
+  const cx=ids.reduce((a,i)=>a+C(i).x,0)/ids.length,cy=ids.reduce((a,i)=>a+C(i).y,0)/ids.length;
+  vb.x=cx-vb.w/2;vb.y=cy-vb.h/2;clampVB();applyVB();
+  const troops=ids.reduce((a,i)=>a+C(i).troops,0);
+  toast(`${FACTS[f].name}·${FACTS[f].leader}　${ids.length} 城 · 兵 ${fmtT(troops)} · ${gensOf(f).length} 将 · ${RANKS[rankIdxOf(f)].name}${f!==state.player&&truceLeft(f)>0?' · 停战剩'+truceLeft(f):''}`);
+  Sound.play('tap');
+});
 function renderAll(){renderMap();renderTopbar();checkRank();if(selected>=0)renderPanel();}
+let armyTarget=-1,recruitOpen=false; // 面板内嵌交互状态
 function select(i){
+  if(selected!==i){armyTarget=-1;recruitOpen=false;}
   selected=i;
   renderMap();renderPanel();
   $('#panel').classList.add('show');
@@ -36,18 +61,19 @@ function select(i){
   Sound.play('tap');
 }
 function deselect(){
-  selected=-1;
+  selected=-1;armyTarget=-1;recruitOpen=false;
   $('#panel').classList.remove('show');
   document.body.classList.remove('panel-open');
   renderMap();
 }
-function deselectKeepPanel(){selected=-1;$('#panel').classList.remove('show');document.body.classList.remove('panel-open');renderMap();}
+function deselectKeepPanel(){selected=-1;armyTarget=-1;recruitOpen=false;$('#panel').classList.remove('show');document.body.classList.remove('panel-open');renderMap();}
 function ownerTag(fid){
   const fd=FACTS[fid];
   return `<span class="ftag" style="color:${fd.color};border-color:${fd.color}">${fd.name} · ${fd.leader}</span>`;
 }
 function gchipHTML(g){
-  return `<span class="gchip">${titleOf(g)?'⚜':''}${g.name}·${effWar(g)}${g.skill?'<small style="color:#e8c96a">·'+SKILLS[g.skill].name+'</small>':''}</span>`;
+  const dot=g.fid===state.player?`<i style="display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px;background:${g.loy>=80?'#6fe89a':g.loy>=60?'#e8c96a':'#ff7a7a'}"></i>`:'';
+  return `<span class="gchip">${dot}${titleOf(g)?'⚜':''}${g.name}·${effWar(g)}${g.skill?'<small style="color:#e8c96a">·'+SKILLS[g.skill].name+'</small>':''}</span>`;
 }
 function renderPanel(){
   if(selected<0)return;
@@ -86,29 +112,66 @@ function renderPanel(){
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn gold" style="flex:2.2;flex-direction:row;justify-content:space-between;padding:12px 14px" data-act="recruit" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
-        <span>⚔️ 征兵</span><small>${c.recUsed?'已征募':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
+        <span>⚔️ 征兵 ${recruitOpen?'▲':'▼'}</span><small>${c.recUsed?'已征募':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
       </button>
       <button class="btn gold" style="flex:1;flex-direction:row;padding:12px 6px" data-act="qrec" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
         <span>⚡速征</span>
       </button>
-    </div>
-    <div class="sec-title">出 兵（可战 ${fmtT(fresh)}）${state.season===3?'<span style="color:#7fb3e8">❄️ 冬季出征 -10%</span>':''}</div>`;
-    ADJ[selected].forEach(n=>{
-      const tc=C(n),hostile=tc.owner!==state.player;
-      const dg=generalsIn(n);
-      const et=edgeType(selected,n);
-      const eTag=et!=='p'?` · ${ETYPE_INFO[et].icon}${ETYPE_INFO[et].name}`:'';
-      html+=`<div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn ${hostile?'atk':'mov'}" style="flex:1;flex-direction:row;justify-content:space-between;padding:12px 12px" data-act="army:${n}" ${fresh<500?'disabled':''}>
-          <span>${hostile?'⚔️ 进攻':'🚚 调动'} → ${tc.name}</span>
-          <small>${FACTS[tc.owner].name}军 ${fmtT(tc.troops)}${hostile?` · 防${tc.wall}${dg.length?' · '+leadName(dg):''}`:''}${eTag}</small>
-        </button>
-        <button class="btn ${hostile?'atk':'mov'}" style="flex:none;flex-direction:row;padding:12px 9px" data-act="quick:${n}" ${fresh<500?'disabled':''} title="${hostile?'全军即刻出击':'移防一半兵力'}">
-          <span>⚡</span>
-        </button>
+    </div>`;
+    // —— 征兵内嵌区 ——
+    if(recruitOpen&&!c.recUsed){
+      const max=Math.min(RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/(RG*rm)/100)*100,Math.floor(f.food/(RF*rm)/100)*100);
+      if(max>=100){
+        html+=`<div class="inline-box" data-max="${max}">
+          <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ir-n">${Math.min(2000,max)}</span> <span style="font-size:13px">人</span>
+            <span class="dim" style="font-size:12px">　💰<span id="ir-g"></span> 🌾<span id="ir-f"></span></span></div>
+          <input type="range" id="ir-slider" min="100" max="${max}" step="100" value="${Math.min(2000,max)}">
+          <div class="qbtns"><button data-irq=".25">25%</button><button data-irq=".5">50%</button><button data-irq=".75">75%</button><button data-irq="1">全力</button>
+            <button class="go" data-act="ir-go">征募！</button></div>
+        </div>`;
+      }else html+=`<div class="dim" style="font-size:12px;margin-top:6px">金钱或粮草不足，无法征兵</div>`;
+    }
+    // —— 出兵 ——
+    if(armyTarget>=0&&ADJ[selected].includes(armyTarget)){
+      const B=C(armyTarget),hostile=B.owner!==state.player;
+      const dGens=generalsIn(armyTarget);
+      let def=Math.min(fresh,hostile?Math.ceil(B.troops*1.6/100)*100+1000:Math.floor(fresh/2/100)*100);
+      def=clamp(def,500,Math.max(500,fresh));
+      const gHtml=gens.length?gens.map(g=>
+        `<label class="gchk"><input type="checkbox" data-iag="${g.id}" checked>${titleOf(g)?'⚜':''}${g.name} 统${effWar(g)}/武${g.wu}</label>`).join('')
+        :'<span class="dim" style="font-size:12px">本城无武将随行</span>';
+      html+=`<div class="sec-title">${hostile?'⚔️ 进攻':'🚚 调动'} → ${B.name}
+        ${hostile?`<span class="dim">（${FACTS[B.owner].name}军 ${fmtT(B.troops)} · 防${B.wall} · ${leadName(dGens)}守）</span>`:''}</div>
+      <div class="inline-box">
+        <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ia-n"></span> <span style="font-size:13px">兵</span></div>
+        <input type="range" id="ia-slider" min="500" max="${Math.max(500,fresh)}" step="100" value="${def}">
+        <div class="qbtns"><button data-iaq=".25">25%</button><button data-iaq=".5">50%</button><button data-iaq=".75">75%</button><button data-iaq="1">全军</button></div>
+        <div style="margin-top:6px">${gHtml}</div>
+        <div class="est" id="ia-est" style="margin-top:8px"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" style="flex:1;flex-direction:row" data-act="ia-cancel">返 回</button>
+          <button class="btn primary" style="flex:2;flex-direction:row;background:linear-gradient(#d9b455,#9a7a28);border-color:#e8c96a;color:#221a06;font-weight:700" data-act="ia-go">${hostile?'出 征 ！':'调 动'}</button>
+        </div>
       </div>`;
-    });
-    if(fresh<500)html+=`<div class="dim" style="font-size:12px;margin-top:6px">可战之兵不足 500，无法出兵（新兵需休整一回合）</div>`;
+    }else{
+      html+=`<div class="sec-title">出 兵（可战 ${fmtT(fresh)}）${state.season===3?'<span style="color:#7fb3e8">❄️ 冬季 -10%</span>':''}</div>`;
+      ADJ[selected].forEach(n=>{
+        const tc=C(n),hostile=tc.owner!==state.player;
+        const dg=generalsIn(n);
+        const et=edgeType(selected,n);
+        const eTag=et!=='p'?` · ${ETYPE_INFO[et].icon}${ETYPE_INFO[et].name}`:'';
+        html+=`<div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn ${hostile?'atk':'mov'}" style="flex:1;flex-direction:row;justify-content:space-between;padding:12px 12px" data-act="army:${n}" ${fresh<500?'disabled':''}>
+            <span>${hostile?'⚔️ 进攻':'🚚 调动'} → ${tc.name}</span>
+            <small>${FACTS[tc.owner].name}军 ${fmtT(tc.troops)}${hostile?` · 防${tc.wall}${dg.length?' · '+leadName(dg):''}`:''}${eTag}</small>
+          </button>
+          <button class="btn ${hostile?'atk':'mov'}" style="flex:none;flex-direction:row;padding:12px 9px" data-act="quick:${n}" ${fresh<500?'disabled':''} title="${hostile?'全军即刻出击':'移防一半兵力'}">
+            <span>⚡</span>
+          </button>
+        </div>`;
+      });
+      if(fresh<500)html+=`<div class="dim" style="font-size:12px;margin-top:6px">可战之兵不足 500，无法出兵（新兵需休整一回合）</div>`;
+    }
   }else{
     const sources=ADJ[selected].filter(n=>C(n).owner===state.player);
     html+=`<div class="sec-title">情 报</div>
@@ -136,6 +199,60 @@ function renderPanel(){
     }
   }
   $('#panel').innerHTML=html;
+  bindPanelInline();
+}
+/* 面板内嵌控件绑定（滑杆/估算实时刷新） */
+function bindPanelInline(){
+  const p=$('#panel');
+  // 征兵滑杆
+  const irs=p.querySelector('#ir-slider');
+  if(irs){
+    const c=C(selected),rm=recruitMult(c);
+    const upd=()=>{
+      const n=+irs.value;
+      p.querySelector('#ir-n').textContent=n.toLocaleString();
+      p.querySelector('#ir-g').textContent=fmtG(n*RG*rm);
+      p.querySelector('#ir-f').textContent=fmtG(n*RF*rm);
+    };
+    irs.addEventListener('input',upd);upd();
+    p.querySelectorAll('[data-irq]').forEach(b=>b.onclick=()=>{
+      const max=+p.querySelector('.inline-box').dataset.max;
+      irs.value=Math.max(100,Math.floor(max*+b.dataset.irq/100)*100);upd();Sound.play('tap');
+    });
+  }
+  // 出兵滑杆
+  const ias=p.querySelector('#ia-slider');
+  if(ias&&armyTarget>=0){
+    const from=selected,to=armyTarget;
+    const A=C(from),B=C(to),hostile=B.owner!==state.player;
+    const fresh=A.troops-A.tired;
+    const picked=()=>[...p.querySelectorAll('input[data-iag]:checked')].map(x=>state.generals.find(g=>g.id===+x.dataset.iag));
+    const upd=()=>{
+      const n=+ias.value;
+      p.querySelector('#ia-n').textContent=n.toLocaleString();
+      const est=p.querySelector('#ia-est');
+      if(hostile){
+        const ap=atkPowerOf(n,picked(),from,to),dp=defPowerOf(to),r=ap/Math.max(1,dp);
+        let txt,col;
+        if(r>1.45){txt='🔥 胜算极大';col='#6fe89a'}
+        else if(r>1.08){txt='✅ 略占优势';col='#a8e06f'}
+        else if(r>0.85){txt='⚖️ 势均力敌';col='#e8c96a'}
+        else{txt='☠️ 凶多吉少';col='#ff7a7a'}
+        const tn=terrainNote(from,to);
+        est.innerHTML=`我 <b>${fmtG(ap)}</b> ⚡ 敌 <b>${fmtG(dp)}</b> · <span style="color:${col};font-weight:700">${txt}</span>
+        <div class="dim" style="font-size:11.5px;margin-top:2px">${tn?tn+' · ':''}留守 ${fmtT(A.troops-n)}</div>`;
+      }else{
+        est.innerHTML=`调动后本城留守 <b>${fmtT(A.troops-n)}</b>，${B.name} 兵力 <b>${fmtT(B.troops+n)}</b>
+        <div class="dim" style="font-size:11.5px;margin-top:2px">${techDone(state.player,'yi')?'📖 驿传：移防即刻可战':'移防之兵需休整一回合'}</div>`;
+      }
+    };
+    ias.addEventListener('input',upd);
+    p.querySelectorAll('input[data-iag]').forEach(x=>x.addEventListener('change',upd));
+    p.querySelectorAll('[data-iaq]').forEach(b=>b.onclick=()=>{
+      ias.value=Math.max(500,Math.floor(fresh*+b.dataset.iaq/100)*100);upd();Sound.play('tap');
+    });
+    upd();
+  }
 }
 $('#panel').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
@@ -143,14 +260,59 @@ $('#panel').addEventListener('click',e=>{
   const act=b.dataset.act;
   Sound.play('tap');
   if(act==='close')return deselect();
-  if(act==='recruit')return openRecruitModal(selected);
+  if(act==='recruit'){recruitOpen=!recruitOpen;armyTarget=-1;return renderPanel();}
   if(act==='qrec')return doQuickRecruit(selected);
+  if(act==='ir-go')return doInlineRecruit();
+  if(act==='ia-cancel'){armyTarget=-1;return renderPanel();}
+  if(act==='ia-go')return doInlineArmy();
   if(act.startsWith('quick:'))return doQuickArmy(selected,+act.slice(6));
   if(act.startsWith('strat-'))return doStrat(selected,act.slice(6));
   if(act.startsWith('dev-'))return doDev(selected,act.slice(4));
-  if(act.startsWith('army:'))return openArmyModal(selected,+act.slice(5));
+  if(act.startsWith('army:')){armyTarget=+act.slice(5);recruitOpen=false;return renderPanel();}
   if(act.startsWith('armyfrom:'))return openArmyModal(+act.slice(9),selected);
 });
+function doInlineRecruit(){
+  const c=C(selected),f=F(state.player);
+  const sl=$('#panel').querySelector('#ir-slider');
+  if(!sl||c.recUsed)return;
+  const n=+sl.value,rm=recruitMult(c);
+  f.gold-=n*RG*rm;f.food-=n*RF*rm;
+  c.troops+=n;c.tired+=n;c.recUsed=true;recruitOpen=false;
+  addLog(`${c.name} 征募新兵 ${n} 人`);
+  Sound.play('coin');
+  toast(`⚔️ ${c.name} 征募 ${n.toLocaleString()} 名新兵`);
+  renderAll();save();
+}
+function doInlineArmy(){
+  const from=selected,to=armyTarget;
+  if(to<0)return;
+  const sl=$('#panel').querySelector('#ia-slider');
+  const n=+sl.value;
+  const gsel=[...$('#panel').querySelectorAll('input[data-iag]:checked')].map(x=>+x.dataset.iag);
+  const B=C(to),hostile=B.owner!==state.player;
+  armyTarget=-1;
+  busy=true;deselectKeepPanel();
+  animateMarch(from,to,FACTS[state.player].color,()=>{
+    if(hostile){
+      const r=doBattle(from,to,n,gsel);
+      renderAll();save();
+      showBattleModal(r);
+      busy=false;
+    }else{
+      doTransfer(from,to,n,gsel);
+      toast(`🚚 ${n.toLocaleString()} 兵移驻 ${B.name}`);
+      busy=false;
+      select(to);renderAll();save();
+    }
+  });
+}
+/* 兼容旧入口（地图点击直达出兵）：现为面板内嵌 */
+function openArmyModal(from,to){
+  selected=from;armyTarget=to;recruitOpen=false;
+  renderMap();renderPanel();
+  $('#panel').classList.add('show');
+  document.body.classList.add('panel-open');
+}
 
 /* ---- 内政 ---- */
 function doDev(cid,kind){
@@ -170,43 +332,6 @@ function doDev(cid,kind){
   Sound.play('coin');
   toast(`✨ ${c.name} ${label} → Lv.${lv}`);
   renderAll();save();
-}
-/* ---- 征兵 ---- */
-function openRecruitModal(cid){
-  const c=C(cid),f=F(state.player);
-  const rm=recruitMult(c),rg=RG*rm,rf=RF*rm;
-  const max=Math.min(RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/rg/100)*100,Math.floor(f.food/rf/100)*100);
-  if(max<100){toast('💰 金钱或粮草不足，无法征兵');return;}
-  const m=modal(`
-    <h3>⚔️ 征兵 · ${c.name}</h3>
-    <div style="font-size:13px" class="dim">现有兵力 ${fmtT(c.troops)} / 上限 ${fmtT(TROOP_CAP)}，单次至多 ${fmtT(RECRUIT_CAP)}</div>
-    <div style="text-align:center;font-size:30px;font-weight:800;margin:10px 0;color:#e8c96a"><span id="rc-n">${Math.min(2000,max)}</span> <span style="font-size:15px">人</span></div>
-    <input type="range" id="rc-slider" min="100" max="${max}" step="100" value="${Math.min(2000,max)}">
-    <div class="qbtns">
-      <button data-q=".25">25%</button><button data-q=".5">50%</button><button data-q=".75">75%</button><button data-q="1">全力</button>
-    </div>
-    <div class="est">耗费 💰<b id="rc-g"></b> 　🌾<b id="rc-f"></b><div class="dim" style="font-size:12px;margin-top:4px">新兵需休整，下回合方可出战</div></div>
-    <div class="row"><button class="btn" data-x="cancel">取消</button><button class="btn primary" data-x="go">征募！</button></div>
-  `);
-  const sl=m.querySelector('#rc-slider');
-  const upd=()=>{
-    const n=+sl.value;
-    m.querySelector('#rc-n').textContent=n.toLocaleString();
-    m.querySelector('#rc-g').textContent=fmtG(n*rg);
-    m.querySelector('#rc-f').textContent=fmtG(n*rf);
-  };
-  sl.addEventListener('input',upd);upd();
-  m.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{sl.value=Math.max(100,Math.floor(max*+b.dataset.q/100)*100);upd()});
-  m.querySelector('[data-x=cancel]').onclick=closeModal;
-  m.querySelector('[data-x=go]').onclick=()=>{
-    const n=+sl.value;
-    f.gold-=n*rg;f.food-=n*rf;
-    c.troops+=n;c.tired+=n;c.recUsed=true;
-    addLog(`${c.name} 征募新兵 ${n} 人`);
-    Sound.play('coin');
-    toast(`⚔️ ${c.name} 征募 ${n.toLocaleString()} 名新兵`);
-    closeModal();renderAll();save();
-  };
 }
 /* ---- 无弹窗快捷操作 ---- */
 function doQuickRecruit(cid){
@@ -242,73 +367,6 @@ function doQuickArmy(from,to){
       select(to);renderAll();save();
     }
   });
-}
-/* ---- 出兵 ---- */
-function openArmyModal(from,to){
-  const A=C(from),B=C(to);
-  const hostile=B.owner!==state.player;
-  const fresh=A.troops-A.tired;
-  if(fresh<500){toast('该城可战之兵不足');return;}
-  const gens=generalsIn(from);
-  const dGens=generalsIn(to);
-  let def=Math.min(fresh,hostile?Math.ceil(B.troops*1.6/100)*100+1000:Math.floor(fresh/2/100)*100);
-  def=clamp(def,500,fresh);
-  const gHtml=gens.length?gens.map(g=>
-    `<label class="gchk"><input type="checkbox" data-g="${g.id}" checked>${titleOf(g)?'⚜':''}${g.name} 统${effWar(g)}/武${g.wu}${g.skill?'·'+SKILLS[g.skill].name:''}</label>`).join('')
-    :'<span class="dim" style="font-size:12px">本城无武将随行</span>';
-  const m=modal(`
-    <h3>${hostile?'⚔️ 进攻':'🚚 调动'} · ${A.name} → ${B.name}</h3>
-    ${hostile?`<div class="b-side"><span>守军 ${FACTS[B.owner].name}·${fmtT(B.troops)}</span><span>城防${B.wall}${B.trait==='fort'?'·🛡️雄关':''}${B.trait==='pass'?'·⛩️关隘':''} · 守将 ${leadName(dGens)}</span></div>`:''}
-    <div style="text-align:center;font-size:30px;font-weight:800;margin:8px 0;color:#e8c96a"><span id="am-n"></span> <span style="font-size:15px">兵</span></div>
-    <input type="range" id="am-slider" min="500" max="${fresh}" step="100" value="${def}">
-    <div class="qbtns"><button data-q=".25">25%</button><button data-q=".5">50%</button><button data-q=".75">75%</button><button data-q="1">全军</button></div>
-    <div style="margin-top:10px"><div class="sec-title" style="margin-top:0">随行武将</div>${gHtml}</div>
-    <div class="est" id="am-est"></div>
-    <div class="row"><button class="btn" data-x="cancel">取消</button>
-    <button class="btn primary" data-x="go">${hostile?'出 征 ！':'调 动'}</button></div>
-  `);
-  const sl=m.querySelector('#am-slider');
-  const pickedGens=()=>[...m.querySelectorAll('input[data-g]:checked')].map(x=>state.generals.find(g=>g.id===+x.dataset.g));
-  const upd=()=>{
-    const n=+sl.value;
-    m.querySelector('#am-n').textContent=n.toLocaleString();
-    const est=m.querySelector('#am-est');
-    if(hostile){
-      const ap=atkPowerOf(n,pickedGens(),from,to),dp=defPowerOf(to),r=ap/Math.max(1,dp);
-      let txt,col;
-      if(r>1.45){txt='🔥 胜算极大';col='#6fe89a'}
-      else if(r>1.08){txt='✅ 略占优势';col='#a8e06f'}
-      else if(r>0.85){txt='⚖️ 势均力敌，胜负难料';col='#e8c96a'}
-      else{txt='☠️ 凶多吉少，不宜强攻';col='#ff7a7a'}
-      const tn=terrainNote(from,to);
-      est.innerHTML=`我军战力 <b>${fmtG(ap)}</b> ⚡ 敌军战力 <b>${fmtG(dp)}</b><div style="color:${col};margin-top:4px;font-weight:700">${txt}</div>
-      <div class="dim" style="font-size:12px;margin-top:3px">${tn?tn+' · ':''}${state.season===3?'❄️ 冬季出征 -10% · ':''}双方有将则可能阵前单挑 · 出兵后 ${A.name} 留守 ${fmtT(A.troops-n)}</div>`;
-    }else{
-      est.innerHTML=`调动后 ${A.name} 留守 <b>${fmtT(A.troops-n)}</b>，${B.name} 兵力 <b>${fmtT(B.troops+n)}</b><div class="dim" style="font-size:12px;margin-top:3px">${techDone(state.player,'yi')?'📖 驿传网络：移防之兵即刻可战':'移防之兵需休整，下回合方可出战'}</div>`;
-    }
-  };
-  sl.addEventListener('input',upd);
-  m.querySelectorAll('input[data-g]').forEach(x=>x.addEventListener('change',upd));
-  m.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{sl.value=Math.max(500,Math.floor(fresh*+b.dataset.q/100)*100);upd()});
-  upd();
-  m.querySelector('[data-x=cancel]').onclick=closeModal;
-  m.querySelector('[data-x=go]').onclick=()=>{
-    const n=+sl.value,gsel=pickedGens().map(g=>g.id);
-    closeModal();busy=true;deselectKeepPanel();
-    animateMarch(from,to,FACTS[state.player].color,()=>{
-      if(B.owner!==state.player){
-        const r=doBattle(from,to,n,gsel);
-        renderAll();save();
-        showBattleModal(r);
-        busy=false;
-      }else{
-        doTransfer(from,to,n,gsel);
-        toast(`🚚 ${n.toLocaleString()} 兵移驻 ${B.name}`);
-        busy=false;
-        select(to);renderAll();save();
-      }
-    });
-  };
 }
 function showBattleModal(r){
   const A=C(r.from),D=C(r.to);
@@ -652,22 +710,28 @@ function buildSetup(){
   wrap.innerHTML='';
   MAJORS.forEach(fid=>{
     const fd=FACTS[fid];
-    const nCities=CITY_DEFS.filter(d=>d[3]===fid).length;
-    const topGens=GEN_DEFS.filter(g=>g[6]===fid).sort((a,b)=>b[1]-a[1]).slice(0,3).map(g=>g[0]).join('、');
     const card=document.createElement('div');
     card.className='fcard'+(fid===setupFid?' sel':'');
     card.style.setProperty('--fc',fd.color);
-    card.innerHTML=`<div class="fname" style="color:${fd.color}">${fd.name} · ${fd.leader}</div>
-      <div class="fdesc">${fd.desc}</div>
-      <div class="fgen">🏯 ${nCities} 城 · 👤 ${topGens}</div>
-      <div class="fgen" style="color:#8fb3d9">⚜ 军略：${PERSONA[fid].label}</div>`;
+    card.innerHTML=`<div class="fname" style="color:${fd.color}">${fd.name}</div>
+      <div class="fmini">${fd.leader} · ${CITY_DEFS.filter(d=>d[3]===fid).length}城</div>`;
     card.onclick=()=>{
       setupFid=fid;Sound.play('tap');
       wrap.querySelectorAll('.fcard').forEach(c=>c.classList.remove('sel'));
       card.classList.add('sel');
+      renderFactDetail();
     };
     wrap.appendChild(card);
   });
+  renderFactDetail();
+}
+function renderFactDetail(){
+  const fd=FACTS[setupFid];
+  const topGens=GEN_DEFS.filter(g=>g[6]===setupFid).sort((a,b)=>b[1]-a[1]).slice(0,4)
+    .map(g=>`${g[0]}<small style="opacity:.6">${g[1]}</small>`).join('、');
+  $('#fact-detail').innerHTML=`<b style="color:${fd.color}">${fd.name} · ${fd.leader}</b>
+    　<span style="color:#8fb3d9">⚜ ${PERSONA[setupFid].label}</span><br>
+    ${fd.desc}<br><span style="color:#e8c96a">👤 ${topGens}</span>`;
 }
 function bindSeg(id,fn){
   $(id).addEventListener('click',e=>{
