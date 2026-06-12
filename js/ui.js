@@ -90,12 +90,15 @@ function renderPanel(){
   </div>
   <div class="flavor">『 ${c.tag} 』</div>
   <div class="statrow">
-    <span class="stat">⚔️ 兵力 <b>${fmtT(c.troops)}</b>${mine&&c.tired>0?` <span class="dim">(可战 ${fmtT(fresh)})</span>`:''}</span>
+    <span class="stat">⚔️ 兵力 <b>${fmtT(c.troops)}</b><span class="dim">/${fmtT(cityCap(c))}</span>${mine&&c.tired>0?` <span class="dim">(可战 ${fmtT(fresh)})</span>`:''}</span>
     <span class="stat">🛡 城防 ${c.wall}</span>
     <span class="stat">🌾 农业 ${c.farm}</span>
     <span class="stat">💰 商业 ${c.comm}</span>
     <span class="stat trait">${t.icon} ${t.name} · ${t.desc}</span>
   </div>
+  ${(()=>{const gov=governorOf(selected);
+    return gov?`<div style="font-size:12px;margin-bottom:6px;color:#d9c08a">✦ 太守 <b>${gov.name}</b>（政 ${gov.pol}）理政，金粮 +${Math.round(Math.min(0.25,gov.pol/400)*100)}%</div>`
+      :(gens.length===0&&MAJORS.includes(c.owner)?`<div style="font-size:12px;margin-bottom:6px;color:#ff9a9a">⚠ 无将驻守：守军战力 -10%，出征/运兵至多 8000</div>`:'');})()}
   <div class="gens">${gHtml}</div>`;
   if(mine){
     const dF=devCost(c.farm),dC=devCost(c.comm);
@@ -111,16 +114,16 @@ function renderPanel(){
       <button class="btn" data-act="dev-wall" ${used||c.wall>=mW||f.gold<dW?'disabled':''}>🛡 筑城<small>${c.wall>=mW?'已满级':dW+'金'}</small></button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn gold" style="flex:2.2;flex-direction:row;justify-content:space-between;padding:12px 14px" data-act="recruit" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
-        <span>⚔️ 征兵 ${recruitOpen?'▲':'▼'}</span><small>${c.recUsed?'已征募':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
+      <button class="btn gold" style="flex:2.2;flex-direction:row;justify-content:space-between;padding:12px 14px" data-act="recruit" ${c.recUsed||c.troops>=cityCap(c)?'disabled':''}>
+        <span>⚔️ 征兵 ${recruitOpen?'▲':'▼'}</span><small>${c.recUsed?'已征募':c.troops>=cityCap(c)?'营垒已满':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
       </button>
-      <button class="btn gold" style="flex:1;flex-direction:row;padding:12px 6px" data-act="qrec" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
+      <button class="btn gold" style="flex:1;flex-direction:row;padding:12px 6px" data-act="qrec" ${c.recUsed||c.troops>=cityCap(c)?'disabled':''}>
         <span>⚡速征</span>
       </button>
     </div>`;
     // —— 征兵内嵌区 ——
     if(recruitOpen&&!c.recUsed){
-      const max=Math.min(RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/(RG*rm)/100)*100,Math.floor(f.food/(RF*rm)/100)*100);
+      const max=Math.min(RECRUIT_CAP,cityCap(c)-c.troops,Math.floor(f.gold/(RG*rm)/100)*100,Math.floor(f.food/(RF*rm)/100)*100);
       if(max>=100){
         html+=`<div class="inline-box" data-max="${max}">
           <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ir-n">${Math.min(2000,max)}</span> <span style="font-size:13px">人</span>
@@ -135,16 +138,18 @@ function renderPanel(){
     if(armyTarget>=0&&ADJ[selected].includes(armyTarget)){
       const B=C(armyTarget),hostile=B.owner!==state.player;
       const dGens=generalsIn(armyTarget);
-      let def=Math.min(fresh,hostile?Math.ceil(B.troops*1.6/100)*100+1000:Math.floor(fresh/2/100)*100);
-      def=clamp(def,500,Math.max(500,fresh));
+      const cap0=Math.min(Math.max(500,fresh),leadCap(gens)); // 初始：全将统御
+      let def=Math.min(cap0,hostile?Math.ceil(B.troops*1.6/100)*100+1000:Math.floor(fresh/2/100)*100);
+      def=clamp(def,500,cap0);
       const gHtml=gens.length?gens.map(g=>
-        `<label class="gchk"><input type="checkbox" data-iag="${g.id}" checked>${titleOf(g)?'⚜':''}${g.name} 统${effWar(g)}/武${g.wu}</label>`).join('')
-        :'<span class="dim" style="font-size:12px">本城无武将随行</span>';
+        `<label class="gchk"><input type="checkbox" data-iag="${g.id}" checked>${titleOf(g)?'⚜':''}${g.name} 统${effWar(g)}<small class="dim">·御${fmtT(effWar(g)*300)}</small></label>`).join('')
+        :'<span class="dim" style="font-size:12px">本城无武将随行（民兵至多 8000）</span>';
       html+=`<div class="sec-title">${hostile?'⚔️ 进攻':'🚚 调动'} → ${B.name}
         ${hostile?`<span class="dim">（${FACTS[B.owner].name}军 ${fmtT(B.troops)} · 防${B.wall} · ${leadName(dGens)}守）</span>`:''}</div>
       <div class="inline-box">
-        <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ia-n"></span> <span style="font-size:13px">兵</span></div>
-        <input type="range" id="ia-slider" min="500" max="${Math.max(500,fresh)}" step="100" value="${def}">
+        <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ia-n"></span> <span style="font-size:13px">兵</span>
+          <span class="dim" style="font-size:11px">　统御上限 <span id="ia-cap"></span></span></div>
+        <input type="range" id="ia-slider" min="500" max="${cap0}" step="100" value="${def}">
         <div class="qbtns"><button data-iaq=".25">25%</button><button data-iaq=".5">50%</button><button data-iaq=".75">75%</button><button data-iaq="1">全军</button></div>
         <div style="margin-top:6px">${gHtml}</div>
         <div class="est" id="ia-est" style="margin-top:8px"></div>
@@ -228,6 +233,12 @@ function bindPanelInline(){
     const fresh=A.troops-A.tired;
     const picked=()=>[...p.querySelectorAll('input[data-iag]:checked')].map(x=>state.generals.find(g=>g.id===+x.dataset.iag));
     const upd=()=>{
+      // 统御上限随勾选武将实时变化
+      const cap=Math.max(500,Math.min(fresh,leadCap(picked())));
+      ias.max=cap;
+      if(+ias.value>cap)ias.value=cap;
+      const capEl=p.querySelector('#ia-cap');
+      if(capEl)capEl.textContent=fmtT(Math.min(fresh,leadCap(picked())));
       const n=+ias.value;
       p.querySelector('#ia-n').textContent=n.toLocaleString();
       const est=p.querySelector('#ia-est');
@@ -249,7 +260,7 @@ function bindPanelInline(){
     ias.addEventListener('input',upd);
     p.querySelectorAll('input[data-iag]').forEach(x=>x.addEventListener('change',upd));
     p.querySelectorAll('[data-iaq]').forEach(b=>b.onclick=()=>{
-      ias.value=Math.max(500,Math.floor(fresh*+b.dataset.iaq/100)*100);upd();Sound.play('tap');
+      ias.value=Math.max(500,Math.floor(+ias.max*+b.dataset.iaq/100)*100);upd();Sound.play('tap');
     });
     upd();
   }
@@ -338,7 +349,7 @@ function doQuickRecruit(cid){
   const c=C(cid),f=F(state.player);
   if(c.recUsed)return;
   const rm=recruitMult(c),rg=RG*rm,rf=RF*rm;
-  const n=Math.min(2000,RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/rg/100)*100,Math.floor(f.food/rf/100)*100);
+  const n=Math.min(2000,RECRUIT_CAP,cityCap(c)-c.troops,Math.floor(f.gold/rg/100)*100,Math.floor(f.food/rf/100)*100);
   if(n<100){toast('💰 金钱或粮草不足');return;}
   f.gold-=n*rg;f.food-=n*rf;
   c.troops+=n;c.tired+=n;c.recUsed=true;
@@ -351,8 +362,10 @@ function doQuickArmy(from,to){
   const hostile=B.owner!==state.player;
   const fresh=A.troops-A.tired;
   if(fresh<500){toast('可战之兵不足');return;}
-  const n=hostile?fresh:Math.max(500,Math.floor(fresh/2/100)*100);
-  const gsel=hostile?generalsIn(from).map(g=>g.id):[];
+  const gens=generalsIn(from);
+  const cap=Math.min(fresh,leadCap(gens));      // 统御上限
+  const n=hostile?cap:Math.max(500,Math.floor(cap/2/100)*100);
+  const gsel=gens.map(g=>g.id);
   busy=true;deselectKeepPanel();
   animateMarch(from,to,FACTS[state.player].color,()=>{
     if(hostile){
@@ -454,10 +467,13 @@ function showRoster(tab){
           <div class="g-stats">${statLine(g)} · <span style="color:${loyCol}">忠 ${g.loy}</span> · 驻 ${g.city>=0?C(g.city).name:'—'}</div></div>
         <div style="display:flex;flex-direction:column;gap:4px;flex:none">
           <button class="btn" style="padding:5px 10px;min-height:0" data-confer="${g.id}">${t?'改授':'授衔'}</button>
-          <button class="btn" style="padding:5px 10px;min-height:0" data-gift="${g.id}" ${f.gold<500||g.loy>=100?'disabled':''}>赏赐</button>
+          <div style="display:flex;gap:4px">
+            <button class="btn" style="padding:5px 8px;min-height:0;font-size:12px" data-gift="${g.id}" ${f.gold<500||g.loy>=100?'disabled':''}>赏赐</button>
+            <button class="btn" style="padding:5px 8px;min-height:0;font-size:12px" data-move="${g.id}" ${f.gold<100?'disabled':''}>调驻</button>
+          </div>
         </div>
       </div>`}).join('')||'<div class="dim">麾下无将</div>';
-    body+=`<div class="dim" style="font-size:12px;margin-top:8px">赏赐 500 金 → 忠诚 +10。忠诚低于 55 的武将可能弃官出走！</div>`;
+    body+=`<div class="dim" style="font-size:12px;margin-top:8px">赏赐 500金 忠诚+10 · 调驻 100金 移防他城 · 统御 = 统率×300，决定出征/运兵规模。</div>`;
   }else if(tab==='world'){
     body=MAJORS.filter(x=>x!==fid&&F(x).alive).map(x=>{
       const gens=gensOf(x).sort((a,b)=>effWar(b)-effWar(a));
@@ -498,6 +514,26 @@ function showRoster(tab){
     f.gold-=500;g.loy=Math.min(100,(g.loy||80)+10);
     Sound.play('coin');toast(`🎁 赏赐 ${g.name}，忠诚 ${g.loy}`);addLog(`赏赐 ${g.name}`);
     save();closeModal();showRoster('mine');
+  });
+  m.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{Sound.play('tap');showMoveGen(+b.dataset.move)});
+}
+/* 武将调驻：选择目的城 */
+function showMoveGen(gid){
+  const g=state.generals.find(x=>x.id===gid);
+  if(!g)return;
+  const rows=cityIdsOf(state.player).map(i=>{
+    const c=C(i);
+    const here=g.city===i;
+    const gov=governorOf(i);
+    return `<button class="btn wide" data-mvto="${i}" ${here?'disabled':''} style="margin-top:6px">
+      <span>${c.cap?'★':''}${c.name}${here?'（现驻）':''}</span>
+      <small>兵 ${fmtT(c.troops)}/${fmtT(cityCap(c))} · ${generalsIn(i).length} 将${gov?' · 太守'+gov.name:''}</small>
+    </button>`}).join('');
+  const m=modal(`<h3>🐎 调驻 · ${g.name} <small class="dim">（统御 ${fmtT(effWar(g)*300)} · 100金）</small></h3>${rows}
+    <div class="row"><button class="btn" id="mv-back">返 回</button></div>`);
+  m.querySelector('#mv-back').onclick=()=>{closeModal();showRoster('mine');};
+  m.querySelectorAll('[data-mvto]').forEach(b=>b.onclick=()=>{
+    if(moveGeneral(gid,+b.dataset.mvto)){closeModal();showRoster('mine');}
   });
 }
 function showConfer(gid){
@@ -652,7 +688,8 @@ function showHelp(){
   <b>🏯 内政</b>：每城每回合一次开发与一次征兵。商业产金、农业产粮，秋季粮产翻倍，冬季出征 -10%。<br>
   <b>🗺 地利</b>：城池特性（🌾粮仓 💰商都 🛡️雄关 🐎马场 ⛵水港 🏹蛮地 ⛩️关隘）与道路地形（🌊渡河 ⛰山道）均影响战力。<br>
   <b>⚔️ 出兵</b>：点己方城市选相邻目标；新征/新到之兵需休整一回合（研成驿传可免）。攻城虽败亦损敌城防。<br>
-  <b>👤 武将五维</b>：统率(领军) 武力(单挑) 智力(计略) 政治(内政) 魅力(劝降)。各有特技（神将/飞将/神算/铁壁…），胜仗与单挑可成长。<br>
+  <b>👤 武将五维</b>：统率(领军) 武力(单挑) 智力(计略) 政治(内政) 魅力(劝降)。各有特技（神将/飞将/神算/铁壁…），胜仗与单挑可成长。<br>  <b>🏯 武将与城</b>：驻城政治最高者为<b>太守</b>（金粮加成至 +25%）；无将之城守军 -10%。武将府可花 100 金<b>调驻</b>任意己方城。<br>
+  <b>🎖 统御</b>：出征与运兵规模 = 随行武将统率×300 之和（无将仅 8000 民兵）；城池驻兵上限由城防与农商等级决定。<br>
   <b>❤️ 忠诚</b>：授衔与赏赐可提升忠诚；忠诚过低武将会弃官出走，亦会被敌国离间。<br>
   <b>⛓ 俘虏</b>：城破时敌将可能被擒——劝降纳为己用（魅力与仁德加成），或释放归野。<br>
   <b>⚜ 官衔</b>：领土晋位（6城州牧→10城大将军→14城丞相）提升岁入并解锁将军号（统率 +2~+9）。<br>

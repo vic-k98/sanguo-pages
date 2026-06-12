@@ -90,6 +90,31 @@ function armyMult(gens){
 }
 function leadName(gens){return gens.length?bestGen(gens).name:'无'}
 function maxLv(c,kind){return kind==='wall'?6:(c.trait==='pass'?3:10)}
+/* 城池驻兵上限：城防与农商规模决定 */
+function cityCap(c){return 8000+c.wall*4000+(c.farm+c.comm)*1500}
+/* 统兵上限：武将统率×200 累加；无将仅 5000 民兵 */
+function leadCap(gens){return gens&&gens.length?gens.reduce((a,g)=>a+effWar(g)*300,0):8000}
+/* 太守：驻城政治最高者，提振城中金粮 */
+function governorOf(cid){
+  const gens=generalsIn(cid);
+  if(!gens.length)return null;
+  return gens.reduce((a,b)=>b.pol>a.pol?b:a);
+}
+/* 武将调驻 */
+function moveGeneral(gid,cid){
+  const g=state.generals.find(x=>x.id===gid);
+  const f=F(state.player);
+  if(!g||g.fid!==state.player||C(cid).owner!==state.player)return false;
+  if(f.gold<100){toast('💰 调驻需 100 金');return false;}
+  f.gold-=100;
+  const from=g.city>=0?C(g.city).name:'—';
+  g.city=cid;
+  addLog(`调 ${g.name} 自${from}移驻 ${C(cid).name}`);
+  toast(`🐎 ${g.name} 移驻 ${C(cid).name}`);
+  Sound.play('march');
+  save();renderAll();
+  return true;
+}
 function recruitMult(c){
   let m=c.trait==='horse'?0.75:c.trait==='wild'?0.65:1;
   if(hasSkillIn(state.cities.indexOf(c),'mu'))m*=0.8;          // 募兵
@@ -211,7 +236,9 @@ function terrainNote(fromCid,toCid){
 }
 function defPowerOf(cid){
   const d=C(cid);
-  let m=armyMult(generalsIn(cid))*(1+d.wall*0.06)*1.12;
+  const gens=generalsIn(cid);
+  let m=armyMult(gens)*(1+d.wall*0.06)*1.12;
+  if(!gens.length&&MAJORS.includes(d.owner))m*=0.9;      // 群龙无首
   if(d.trait==='fort')m*=1.15;
   if(d.trait==='pass')m*=1.3;
   if(hasSkillIn(cid,'tie'))m*=1.1;                       // 铁壁
@@ -349,8 +376,10 @@ function doBattle(from,to,commit,genIds){
 }
 function doTransfer(from,to,n,genIds){
   const A=C(from),B=C(to);
+  n=Math.min(n,Math.max(0,cityCap(B)-B.troops)); // 目标城容量限制
+  if(n<=0){toast(`${B.name} 营垒已满，无法再驻军`);return;}
   A.troops-=n;A.tired=Math.min(A.tired,A.troops);
-  B.troops=Math.min(TROOP_CAP,B.troops+n);
+  B.troops+=n;
   if(!techDone(A.owner,'yi'))B.tired+=n; // 驿传：调动无需休整
   genIds.forEach(id=>{const g=state.generals.find(g=>g.id===id);if(g)g.city=to;});
   addLog(`${A.name} 移兵 ${n} 至 ${B.name}`);
@@ -403,6 +432,8 @@ function incomeAll(){
       let fd=c.farm*FOOD_PER_FARM*(state.season===2?2:1)*(c.trait==='gran'?1.4:1);
       if(hasSkillIn(i,'shang'))g*=1.2;  // 商才
       if(hasSkillIn(i,'tun'))fd*=1.2;   // 屯田
+      const gov=governorOf(i);          // 太守理政：政治越高金粮越丰
+      if(gov){const gb=1+Math.min(0.25,gov.pol/400);g*=gb;fd*=gb;}
       gold+=g;food+=fd;troops+=c.troops;
     });
     if(techDone(fid,'shi'))gold*=1.15;

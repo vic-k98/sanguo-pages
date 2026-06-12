@@ -734,7 +734,7 @@ const HISTORY=[
    fx:()=>{nerfCities('wei',0.86);F('wu').gold+=1000}},
   {id:'machao',y:211,s:0,title:'马超兴兵',cond:()=>F('teng').alive,
    text:'马超尽起羌胡之众，西凉铁骑十万，剽悍天下闻名。（凉州各城兵势大振）',
-   fx:()=>{cityIdsOf('teng').slice(0,2).forEach(i=>{const c=C(i);c.troops=Math.min(TROOP_CAP,c.troops+3000);c.tired+=3000})}},
+   fx:()=>{cityIdsOf('teng').slice(0,2).forEach(i=>{const c=C(i);c.troops=Math.min(cityCap(c),c.troops+3000);c.tired+=3000})}},
   {id:'locust',y:214,s:2,title:'蝗灾蔽日',cond:()=>true,
    text:'飞蝗蔽天，禾稼食尽，谷一斛五十万钱。是岁天下大饥。（各势力存粮 -30%）',
    fx:()=>{MAJORS.forEach(f=>{if(F(f).alive)F(f).food=Math.floor(F(f).food*0.7)})}},
@@ -752,7 +752,7 @@ const HISTORY=[
    fx:()=>{F('shu').gold+=800;const g=state.generals.find(g=>g.name==='诸葛亮'&&g.fid==='shu');if(g)g.war=99}},
   {id:'menghuo',y:225,s:2,title:'七擒孟获',cond:()=>F('shu').alive&&C(3).owner==='shu',
    text:'五月渡泸，深入不毛。七擒七纵，南人不复反矣。南中劲卒、青羌万骑充入蜀军。（成都 +2500 兵）',
-   fx:()=>{C(3).troops=Math.min(TROOP_CAP,C(3).troops+2500);C(3).tired+=2500}},
+   fx:()=>{C(3).troops=Math.min(cityCap(C(3)),C(3).troops+2500);C(3).tired+=2500}},
 ];
 /* ============ 抉择事件 ============ */
 const CHOICES=[
@@ -769,11 +769,11 @@ const CHOICES=[
    b:{label:'🙏 以礼相送',fx:()=>'名士飘然而去，不知所踪。'}},
   {t:'🐎 胡商献马',d:'西域胡商携良马数百匹至 {c}，皆汗血龙驹，愿售于君侯。',
    a:{label:'💰 购马练骑（600 金，+1500 兵）',cond:()=>F(state.player).gold>=600,
-      fx:(c)=>{F(state.player).gold-=600;c.troops=Math.min(TROOP_CAP,c.troops+1500);c.tired+=1500;return `${c.name}新练骑卒 1500，军容更盛！`}},
+      fx:(c)=>{F(state.player).gold-=600;c.troops=Math.min(cityCap(c),c.troops+1500);c.tired+=1500;return `${c.name}新练骑卒 1500，军容更盛！`}},
    b:{label:'婉拒之',fx:()=>'胡商驱马而去，往他乡贸易。'}},
   {t:'⛩ 祥瑞现世',d:'{c} 郊野有黄龙现于江中，五色云气聚于城楼。百姓争相传颂，以为天命所归。',
    a:{label:'📜 昭告天下（义勇来投 +1200 兵）',
-      fx:(c)=>{c.troops=Math.min(TROOP_CAP,c.troops+1200);c.tired+=1200;return `四方义士闻祥瑞来投，${c.name} 得兵 1200！`}},
+      fx:(c)=>{c.troops=Math.min(cityCap(c),c.troops+1200);c.tired+=1200;return `四方义士闻祥瑞来投，${c.name} 得兵 1200！`}},
    b:{label:'💰 设坛纳贡（+500 金）',
       fx:()=>{F(state.player).gold+=500;return '士绅纳贡称贺，府库添金 500。'}}},
   {t:'🌊 河堤告急',d:'连日暴雨，{c} 河堤将溃，万顷良田危在旦夕！',
@@ -793,7 +793,7 @@ const EVENTS=[
   {t:'💰 西域商队途经 {c}，贸易获利（+400 金）',f:(f,c)=>f.gold+=400},
   {t:'🏚 {c} 遭遇旱灾，粮草受损（-300 粮）',f:(f,c)=>f.food=Math.max(0,f.food-300)},
   {t:'🤒 {c} 爆发疫病，士卒减员',f:(f,c)=>{const d=Math.floor(c.troops*0.08);c.troops-=d;c.tired=Math.min(c.tired,c.troops);}},
-  {t:'🚩 流民来投，{c} 募得乡勇 1200',f:(f,c)=>{c.troops=Math.min(TROOP_CAP,c.troops+1200);c.tired+=1200;}},
+  {t:'🚩 流民来投，{c} 募得乡勇 1200',f:(f,c)=>{c.troops=Math.min(cityCap(c),c.troops+1200);c.tired+=1200;}},
   {t:'⚒ 能工巧匠献策，{c} 城防加固',f:(f,c)=>{if(c.wall<6)c.wall++;}},
 ];
 const DUEL_WIN=['{w} 大喝一声，刀光闪处 {l} 拨马便走，{s}军士气大振！',
@@ -894,6 +894,31 @@ function armyMult(gens){
 }
 function leadName(gens){return gens.length?bestGen(gens).name:'无'}
 function maxLv(c,kind){return kind==='wall'?6:(c.trait==='pass'?3:10)}
+/* 城池驻兵上限：城防与农商规模决定 */
+function cityCap(c){return 8000+c.wall*4000+(c.farm+c.comm)*1500}
+/* 统兵上限：武将统率×200 累加；无将仅 5000 民兵 */
+function leadCap(gens){return gens&&gens.length?gens.reduce((a,g)=>a+effWar(g)*300,0):8000}
+/* 太守：驻城政治最高者，提振城中金粮 */
+function governorOf(cid){
+  const gens=generalsIn(cid);
+  if(!gens.length)return null;
+  return gens.reduce((a,b)=>b.pol>a.pol?b:a);
+}
+/* 武将调驻 */
+function moveGeneral(gid,cid){
+  const g=state.generals.find(x=>x.id===gid);
+  const f=F(state.player);
+  if(!g||g.fid!==state.player||C(cid).owner!==state.player)return false;
+  if(f.gold<100){toast('💰 调驻需 100 金');return false;}
+  f.gold-=100;
+  const from=g.city>=0?C(g.city).name:'—';
+  g.city=cid;
+  addLog(`调 ${g.name} 自${from}移驻 ${C(cid).name}`);
+  toast(`🐎 ${g.name} 移驻 ${C(cid).name}`);
+  Sound.play('march');
+  save();renderAll();
+  return true;
+}
 function recruitMult(c){
   let m=c.trait==='horse'?0.75:c.trait==='wild'?0.65:1;
   if(hasSkillIn(state.cities.indexOf(c),'mu'))m*=0.8;          // 募兵
@@ -1015,7 +1040,9 @@ function terrainNote(fromCid,toCid){
 }
 function defPowerOf(cid){
   const d=C(cid);
-  let m=armyMult(generalsIn(cid))*(1+d.wall*0.06)*1.12;
+  const gens=generalsIn(cid);
+  let m=armyMult(gens)*(1+d.wall*0.06)*1.12;
+  if(!gens.length&&MAJORS.includes(d.owner))m*=0.9;      // 群龙无首
   if(d.trait==='fort')m*=1.15;
   if(d.trait==='pass')m*=1.3;
   if(hasSkillIn(cid,'tie'))m*=1.1;                       // 铁壁
@@ -1153,8 +1180,10 @@ function doBattle(from,to,commit,genIds){
 }
 function doTransfer(from,to,n,genIds){
   const A=C(from),B=C(to);
+  n=Math.min(n,Math.max(0,cityCap(B)-B.troops)); // 目标城容量限制
+  if(n<=0){toast(`${B.name} 营垒已满，无法再驻军`);return;}
   A.troops-=n;A.tired=Math.min(A.tired,A.troops);
-  B.troops=Math.min(TROOP_CAP,B.troops+n);
+  B.troops+=n;
   if(!techDone(A.owner,'yi'))B.tired+=n; // 驿传：调动无需休整
   genIds.forEach(id=>{const g=state.generals.find(g=>g.id===id);if(g)g.city=to;});
   addLog(`${A.name} 移兵 ${n} 至 ${B.name}`);
@@ -1207,6 +1236,8 @@ function incomeAll(){
       let fd=c.farm*FOOD_PER_FARM*(state.season===2?2:1)*(c.trait==='gran'?1.4:1);
       if(hasSkillIn(i,'shang'))g*=1.2;  // 商才
       if(hasSkillIn(i,'tun'))fd*=1.2;   // 屯田
+      const gov=governorOf(i);          // 太守理政：政治越高金粮越丰
+      if(gov){const gb=1+Math.min(0.25,gov.pol/400);g*=gb;fd*=gb;}
       gold+=g;food+=fd;troops+=c.troops;
     });
     if(techDone(fid,'shi'))gold*=1.15;
@@ -1896,12 +1927,15 @@ function renderPanel(){
   </div>
   <div class="flavor">『 ${c.tag} 』</div>
   <div class="statrow">
-    <span class="stat">⚔️ 兵力 <b>${fmtT(c.troops)}</b>${mine&&c.tired>0?` <span class="dim">(可战 ${fmtT(fresh)})</span>`:''}</span>
+    <span class="stat">⚔️ 兵力 <b>${fmtT(c.troops)}</b><span class="dim">/${fmtT(cityCap(c))}</span>${mine&&c.tired>0?` <span class="dim">(可战 ${fmtT(fresh)})</span>`:''}</span>
     <span class="stat">🛡 城防 ${c.wall}</span>
     <span class="stat">🌾 农业 ${c.farm}</span>
     <span class="stat">💰 商业 ${c.comm}</span>
     <span class="stat trait">${t.icon} ${t.name} · ${t.desc}</span>
   </div>
+  ${(()=>{const gov=governorOf(selected);
+    return gov?`<div style="font-size:12px;margin-bottom:6px;color:#d9c08a">✦ 太守 <b>${gov.name}</b>（政 ${gov.pol}）理政，金粮 +${Math.round(Math.min(0.25,gov.pol/400)*100)}%</div>`
+      :(gens.length===0&&MAJORS.includes(c.owner)?`<div style="font-size:12px;margin-bottom:6px;color:#ff9a9a">⚠ 无将驻守：守军战力 -10%，出征/运兵至多 8000</div>`:'');})()}
   <div class="gens">${gHtml}</div>`;
   if(mine){
     const dF=devCost(c.farm),dC=devCost(c.comm);
@@ -1917,16 +1951,16 @@ function renderPanel(){
       <button class="btn" data-act="dev-wall" ${used||c.wall>=mW||f.gold<dW?'disabled':''}>🛡 筑城<small>${c.wall>=mW?'已满级':dW+'金'}</small></button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn gold" style="flex:2.2;flex-direction:row;justify-content:space-between;padding:12px 14px" data-act="recruit" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
-        <span>⚔️ 征兵 ${recruitOpen?'▲':'▼'}</span><small>${c.recUsed?'已征募':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
+      <button class="btn gold" style="flex:2.2;flex-direction:row;justify-content:space-between;padding:12px 14px" data-act="recruit" ${c.recUsed||c.troops>=cityCap(c)?'disabled':''}>
+        <span>⚔️ 征兵 ${recruitOpen?'▲':'▼'}</span><small>${c.recUsed?'已征募':c.troops>=cityCap(c)?'营垒已满':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
       </button>
-      <button class="btn gold" style="flex:1;flex-direction:row;padding:12px 6px" data-act="qrec" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
+      <button class="btn gold" style="flex:1;flex-direction:row;padding:12px 6px" data-act="qrec" ${c.recUsed||c.troops>=cityCap(c)?'disabled':''}>
         <span>⚡速征</span>
       </button>
     </div>`;
     // —— 征兵内嵌区 ——
     if(recruitOpen&&!c.recUsed){
-      const max=Math.min(RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/(RG*rm)/100)*100,Math.floor(f.food/(RF*rm)/100)*100);
+      const max=Math.min(RECRUIT_CAP,cityCap(c)-c.troops,Math.floor(f.gold/(RG*rm)/100)*100,Math.floor(f.food/(RF*rm)/100)*100);
       if(max>=100){
         html+=`<div class="inline-box" data-max="${max}">
           <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ir-n">${Math.min(2000,max)}</span> <span style="font-size:13px">人</span>
@@ -1941,16 +1975,18 @@ function renderPanel(){
     if(armyTarget>=0&&ADJ[selected].includes(armyTarget)){
       const B=C(armyTarget),hostile=B.owner!==state.player;
       const dGens=generalsIn(armyTarget);
-      let def=Math.min(fresh,hostile?Math.ceil(B.troops*1.6/100)*100+1000:Math.floor(fresh/2/100)*100);
-      def=clamp(def,500,Math.max(500,fresh));
+      const cap0=Math.min(Math.max(500,fresh),leadCap(gens)); // 初始：全将统御
+      let def=Math.min(cap0,hostile?Math.ceil(B.troops*1.6/100)*100+1000:Math.floor(fresh/2/100)*100);
+      def=clamp(def,500,cap0);
       const gHtml=gens.length?gens.map(g=>
-        `<label class="gchk"><input type="checkbox" data-iag="${g.id}" checked>${titleOf(g)?'⚜':''}${g.name} 统${effWar(g)}/武${g.wu}</label>`).join('')
-        :'<span class="dim" style="font-size:12px">本城无武将随行</span>';
+        `<label class="gchk"><input type="checkbox" data-iag="${g.id}" checked>${titleOf(g)?'⚜':''}${g.name} 统${effWar(g)}<small class="dim">·御${fmtT(effWar(g)*300)}</small></label>`).join('')
+        :'<span class="dim" style="font-size:12px">本城无武将随行（民兵至多 8000）</span>';
       html+=`<div class="sec-title">${hostile?'⚔️ 进攻':'🚚 调动'} → ${B.name}
         ${hostile?`<span class="dim">（${FACTS[B.owner].name}军 ${fmtT(B.troops)} · 防${B.wall} · ${leadName(dGens)}守）</span>`:''}</div>
       <div class="inline-box">
-        <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ia-n"></span> <span style="font-size:13px">兵</span></div>
-        <input type="range" id="ia-slider" min="500" max="${Math.max(500,fresh)}" step="100" value="${def}">
+        <div style="text-align:center;font-size:24px;font-weight:800;color:#e8c96a"><span id="ia-n"></span> <span style="font-size:13px">兵</span>
+          <span class="dim" style="font-size:11px">　统御上限 <span id="ia-cap"></span></span></div>
+        <input type="range" id="ia-slider" min="500" max="${cap0}" step="100" value="${def}">
         <div class="qbtns"><button data-iaq=".25">25%</button><button data-iaq=".5">50%</button><button data-iaq=".75">75%</button><button data-iaq="1">全军</button></div>
         <div style="margin-top:6px">${gHtml}</div>
         <div class="est" id="ia-est" style="margin-top:8px"></div>
@@ -2034,6 +2070,12 @@ function bindPanelInline(){
     const fresh=A.troops-A.tired;
     const picked=()=>[...p.querySelectorAll('input[data-iag]:checked')].map(x=>state.generals.find(g=>g.id===+x.dataset.iag));
     const upd=()=>{
+      // 统御上限随勾选武将实时变化
+      const cap=Math.max(500,Math.min(fresh,leadCap(picked())));
+      ias.max=cap;
+      if(+ias.value>cap)ias.value=cap;
+      const capEl=p.querySelector('#ia-cap');
+      if(capEl)capEl.textContent=fmtT(Math.min(fresh,leadCap(picked())));
       const n=+ias.value;
       p.querySelector('#ia-n').textContent=n.toLocaleString();
       const est=p.querySelector('#ia-est');
@@ -2055,7 +2097,7 @@ function bindPanelInline(){
     ias.addEventListener('input',upd);
     p.querySelectorAll('input[data-iag]').forEach(x=>x.addEventListener('change',upd));
     p.querySelectorAll('[data-iaq]').forEach(b=>b.onclick=()=>{
-      ias.value=Math.max(500,Math.floor(fresh*+b.dataset.iaq/100)*100);upd();Sound.play('tap');
+      ias.value=Math.max(500,Math.floor(+ias.max*+b.dataset.iaq/100)*100);upd();Sound.play('tap');
     });
     upd();
   }
@@ -2144,7 +2186,7 @@ function doQuickRecruit(cid){
   const c=C(cid),f=F(state.player);
   if(c.recUsed)return;
   const rm=recruitMult(c),rg=RG*rm,rf=RF*rm;
-  const n=Math.min(2000,RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/rg/100)*100,Math.floor(f.food/rf/100)*100);
+  const n=Math.min(2000,RECRUIT_CAP,cityCap(c)-c.troops,Math.floor(f.gold/rg/100)*100,Math.floor(f.food/rf/100)*100);
   if(n<100){toast('💰 金钱或粮草不足');return;}
   f.gold-=n*rg;f.food-=n*rf;
   c.troops+=n;c.tired+=n;c.recUsed=true;
@@ -2157,8 +2199,10 @@ function doQuickArmy(from,to){
   const hostile=B.owner!==state.player;
   const fresh=A.troops-A.tired;
   if(fresh<500){toast('可战之兵不足');return;}
-  const n=hostile?fresh:Math.max(500,Math.floor(fresh/2/100)*100);
-  const gsel=hostile?generalsIn(from).map(g=>g.id):[];
+  const gens=generalsIn(from);
+  const cap=Math.min(fresh,leadCap(gens));      // 统御上限
+  const n=hostile?cap:Math.max(500,Math.floor(cap/2/100)*100);
+  const gsel=gens.map(g=>g.id);
   busy=true;deselectKeepPanel();
   animateMarch(from,to,FACTS[state.player].color,()=>{
     if(hostile){
@@ -2260,10 +2304,13 @@ function showRoster(tab){
           <div class="g-stats">${statLine(g)} · <span style="color:${loyCol}">忠 ${g.loy}</span> · 驻 ${g.city>=0?C(g.city).name:'—'}</div></div>
         <div style="display:flex;flex-direction:column;gap:4px;flex:none">
           <button class="btn" style="padding:5px 10px;min-height:0" data-confer="${g.id}">${t?'改授':'授衔'}</button>
-          <button class="btn" style="padding:5px 10px;min-height:0" data-gift="${g.id}" ${f.gold<500||g.loy>=100?'disabled':''}>赏赐</button>
+          <div style="display:flex;gap:4px">
+            <button class="btn" style="padding:5px 8px;min-height:0;font-size:12px" data-gift="${g.id}" ${f.gold<500||g.loy>=100?'disabled':''}>赏赐</button>
+            <button class="btn" style="padding:5px 8px;min-height:0;font-size:12px" data-move="${g.id}" ${f.gold<100?'disabled':''}>调驻</button>
+          </div>
         </div>
       </div>`}).join('')||'<div class="dim">麾下无将</div>';
-    body+=`<div class="dim" style="font-size:12px;margin-top:8px">赏赐 500 金 → 忠诚 +10。忠诚低于 55 的武将可能弃官出走！</div>`;
+    body+=`<div class="dim" style="font-size:12px;margin-top:8px">赏赐 500金 忠诚+10 · 调驻 100金 移防他城 · 统御 = 统率×300，决定出征/运兵规模。</div>`;
   }else if(tab==='world'){
     body=MAJORS.filter(x=>x!==fid&&F(x).alive).map(x=>{
       const gens=gensOf(x).sort((a,b)=>effWar(b)-effWar(a));
@@ -2304,6 +2351,26 @@ function showRoster(tab){
     f.gold-=500;g.loy=Math.min(100,(g.loy||80)+10);
     Sound.play('coin');toast(`🎁 赏赐 ${g.name}，忠诚 ${g.loy}`);addLog(`赏赐 ${g.name}`);
     save();closeModal();showRoster('mine');
+  });
+  m.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{Sound.play('tap');showMoveGen(+b.dataset.move)});
+}
+/* 武将调驻：选择目的城 */
+function showMoveGen(gid){
+  const g=state.generals.find(x=>x.id===gid);
+  if(!g)return;
+  const rows=cityIdsOf(state.player).map(i=>{
+    const c=C(i);
+    const here=g.city===i;
+    const gov=governorOf(i);
+    return `<button class="btn wide" data-mvto="${i}" ${here?'disabled':''} style="margin-top:6px">
+      <span>${c.cap?'★':''}${c.name}${here?'（现驻）':''}</span>
+      <small>兵 ${fmtT(c.troops)}/${fmtT(cityCap(c))} · ${generalsIn(i).length} 将${gov?' · 太守'+gov.name:''}</small>
+    </button>`}).join('');
+  const m=modal(`<h3>🐎 调驻 · ${g.name} <small class="dim">（统御 ${fmtT(effWar(g)*300)} · 100金）</small></h3>${rows}
+    <div class="row"><button class="btn" id="mv-back">返 回</button></div>`);
+  m.querySelector('#mv-back').onclick=()=>{closeModal();showRoster('mine');};
+  m.querySelectorAll('[data-mvto]').forEach(b=>b.onclick=()=>{
+    if(moveGeneral(gid,+b.dataset.mvto)){closeModal();showRoster('mine');}
   });
 }
 function showConfer(gid){
@@ -2458,7 +2525,8 @@ function showHelp(){
   <b>🏯 内政</b>：每城每回合一次开发与一次征兵。商业产金、农业产粮，秋季粮产翻倍，冬季出征 -10%。<br>
   <b>🗺 地利</b>：城池特性（🌾粮仓 💰商都 🛡️雄关 🐎马场 ⛵水港 🏹蛮地 ⛩️关隘）与道路地形（🌊渡河 ⛰山道）均影响战力。<br>
   <b>⚔️ 出兵</b>：点己方城市选相邻目标；新征/新到之兵需休整一回合（研成驿传可免）。攻城虽败亦损敌城防。<br>
-  <b>👤 武将五维</b>：统率(领军) 武力(单挑) 智力(计略) 政治(内政) 魅力(劝降)。各有特技（神将/飞将/神算/铁壁…），胜仗与单挑可成长。<br>
+  <b>👤 武将五维</b>：统率(领军) 武力(单挑) 智力(计略) 政治(内政) 魅力(劝降)。各有特技（神将/飞将/神算/铁壁…），胜仗与单挑可成长。<br>  <b>🏯 武将与城</b>：驻城政治最高者为<b>太守</b>（金粮加成至 +25%）；无将之城守军 -10%。武将府可花 100 金<b>调驻</b>任意己方城。<br>
+  <b>🎖 统御</b>：出征与运兵规模 = 随行武将统率×300 之和（无将仅 8000 民兵）；城池驻兵上限由城防与农商等级决定。<br>
   <b>❤️ 忠诚</b>：授衔与赏赐可提升忠诚；忠诚过低武将会弃官出走，亦会被敌国离间。<br>
   <b>⛓ 俘虏</b>：城破时敌将可能被擒——劝降纳为己用（魅力与仁德加成），或释放归野。<br>
   <b>⚜ 官衔</b>：领土晋位（6城州牧→10城大将军→14城丞相）提升岁入并解锁将军号（统率 +2~+9）。<br>
@@ -2580,6 +2648,17 @@ function aiTurn(fid,reports){
   aiConfer(fid);
   aiResearch(fid);
   const myIds=cityIdsOf(fid);
+  // 武将调度：富余武将外派到无将之城（优先边境）
+  {
+    const noGen=myIds.filter(i=>generalsIn(i).length===0)
+      .sort((a,b)=>(ADJ[b].some(m=>C(m).owner!==fid)?1:0)-(ADJ[a].some(m=>C(m).owner!==fid)?1:0));
+    for(const tgt of noGen){
+      const src=myIds.find(i=>generalsIn(i).length>=2);
+      if(src===undefined)break;
+      const gs=generalsIn(src);
+      gs.sort((a,b)=>effWar(a)-effWar(b))[0].city=tgt; // 派次将赴任
+    }
+  }
   for(const cid of myIds){
     const c=C(cid);
     if(c.owner!==fid)continue;
@@ -2599,9 +2678,9 @@ function aiTurn(fid,reports){
       const myP=atkPowerOf(c.troops,generalsIn(cid),cid);
       if(weakest*1.05>myP)recTarget=Math.min(42000,p.rec+20000);
     }
-    if(!c.recUsed&&isBorder&&c.troops<recTarget){
+    if(!c.recUsed&&isBorder&&c.troops<Math.min(recTarget,cityCap(c))){
       const rm=recruitMult(c);
-      const n=Math.min(RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold*0.6/(RG*rm)/100)*100,Math.floor(f.food*0.4/(RF*rm)/100)*100);
+      const n=Math.min(RECRUIT_CAP,cityCap(c)-c.troops,Math.floor(f.gold*0.6/(RG*rm)/100)*100,Math.floor(f.food*0.4/(RF*rm)/100)*100);
       if(n>=1000){f.gold-=n*RG*rm;f.food-=n*RF*rm;c.troops+=n;c.tired+=n;c.recUsed=true;}
     }
     // 进攻
@@ -2613,21 +2692,23 @@ function aiTurn(fid,reports){
       else if(myIds.length>=12)thr*=0.8;
       thr=Math.max(myIds.length>=15?1.0:1.05,thr);
       const ratio=fresh>p.rec*1.2?0.9:0.85;
+      const cityGens=generalsIn(cid);
+      const lcap=leadCap(cityGens); // 统御上限
       let best=-1,bestScore=0;
       for(const n of hostileN){
         const t=C(n);
         if(t.owner===state.player&&truceLeft(fid)>0)continue;
         const need=defPowerOf(n)*thr+1000;
-        const commit=Math.floor(fresh*ratio);
-        const myP=atkPowerOf(commit,generalsIn(cid),cid,n);
+        const commit=Math.min(Math.floor(fresh*ratio),lcap);
+        const myP=atkPowerOf(commit,cityGens,cid,n);
         if(myP>need){
           const score=(myP/Math.max(1,need))*(t.owner==='neutral'?p.neu:1);
           if(score>bestScore){bestScore=score;best=n;}
         }
       }
       if(best>=0){
-        const commit=Math.floor(fresh*ratio);
-        const gids=generalsIn(cid).map(g=>g.id);
+        const commit=Math.min(Math.floor(fresh*ratio),lcap);
+        const gids=cityGens.map(g=>g.id);
         const r=doBattle(cid,best,commit,gids);
         reports.push(r);
         continue;
@@ -2639,10 +2720,12 @@ function aiTurn(fid,reports){
       const front=friends.find(n=>ADJ[n].some(m=>C(m).owner!==fid));
       const tgt=front!==undefined?front:friends[0];
       if(tgt!==undefined){
-        const n=Math.floor((c.troops-4000)/100)*100;
+        const t=C(tgt);
+        const n=Math.min(Math.floor((c.troops-4000)/100)*100,
+          leadCap(generalsIn(cid)),Math.max(0,cityCap(t)-t.troops));
         if(n>=1000){
           c.troops-=n;c.tired=Math.min(c.tired,c.troops);
-          const t=C(tgt);t.troops=Math.min(TROOP_CAP,t.troops+n);t.tired+=n;
+          t.troops+=n;t.tired+=n;
           state.generals.filter(g=>g.fid===fid&&g.city===cid).slice(1).forEach(g=>g.city=tgt);
         }
       }

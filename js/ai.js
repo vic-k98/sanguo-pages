@@ -28,6 +28,17 @@ function aiTurn(fid,reports){
   aiConfer(fid);
   aiResearch(fid);
   const myIds=cityIdsOf(fid);
+  // 武将调度：富余武将外派到无将之城（优先边境）
+  {
+    const noGen=myIds.filter(i=>generalsIn(i).length===0)
+      .sort((a,b)=>(ADJ[b].some(m=>C(m).owner!==fid)?1:0)-(ADJ[a].some(m=>C(m).owner!==fid)?1:0));
+    for(const tgt of noGen){
+      const src=myIds.find(i=>generalsIn(i).length>=2);
+      if(src===undefined)break;
+      const gs=generalsIn(src);
+      gs.sort((a,b)=>effWar(a)-effWar(b))[0].city=tgt; // 派次将赴任
+    }
+  }
   for(const cid of myIds){
     const c=C(cid);
     if(c.owner!==fid)continue;
@@ -47,9 +58,9 @@ function aiTurn(fid,reports){
       const myP=atkPowerOf(c.troops,generalsIn(cid),cid);
       if(weakest*1.05>myP)recTarget=Math.min(42000,p.rec+20000);
     }
-    if(!c.recUsed&&isBorder&&c.troops<recTarget){
+    if(!c.recUsed&&isBorder&&c.troops<Math.min(recTarget,cityCap(c))){
       const rm=recruitMult(c);
-      const n=Math.min(RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold*0.6/(RG*rm)/100)*100,Math.floor(f.food*0.4/(RF*rm)/100)*100);
+      const n=Math.min(RECRUIT_CAP,cityCap(c)-c.troops,Math.floor(f.gold*0.6/(RG*rm)/100)*100,Math.floor(f.food*0.4/(RF*rm)/100)*100);
       if(n>=1000){f.gold-=n*RG*rm;f.food-=n*RF*rm;c.troops+=n;c.tired+=n;c.recUsed=true;}
     }
     // 进攻
@@ -61,21 +72,23 @@ function aiTurn(fid,reports){
       else if(myIds.length>=12)thr*=0.8;
       thr=Math.max(myIds.length>=15?1.0:1.05,thr);
       const ratio=fresh>p.rec*1.2?0.9:0.85;
+      const cityGens=generalsIn(cid);
+      const lcap=leadCap(cityGens); // 统御上限
       let best=-1,bestScore=0;
       for(const n of hostileN){
         const t=C(n);
         if(t.owner===state.player&&truceLeft(fid)>0)continue;
         const need=defPowerOf(n)*thr+1000;
-        const commit=Math.floor(fresh*ratio);
-        const myP=atkPowerOf(commit,generalsIn(cid),cid,n);
+        const commit=Math.min(Math.floor(fresh*ratio),lcap);
+        const myP=atkPowerOf(commit,cityGens,cid,n);
         if(myP>need){
           const score=(myP/Math.max(1,need))*(t.owner==='neutral'?p.neu:1);
           if(score>bestScore){bestScore=score;best=n;}
         }
       }
       if(best>=0){
-        const commit=Math.floor(fresh*ratio);
-        const gids=generalsIn(cid).map(g=>g.id);
+        const commit=Math.min(Math.floor(fresh*ratio),lcap);
+        const gids=cityGens.map(g=>g.id);
         const r=doBattle(cid,best,commit,gids);
         reports.push(r);
         continue;
@@ -87,10 +100,12 @@ function aiTurn(fid,reports){
       const front=friends.find(n=>ADJ[n].some(m=>C(m).owner!==fid));
       const tgt=front!==undefined?front:friends[0];
       if(tgt!==undefined){
-        const n=Math.floor((c.troops-4000)/100)*100;
+        const t=C(tgt);
+        const n=Math.min(Math.floor((c.troops-4000)/100)*100,
+          leadCap(generalsIn(cid)),Math.max(0,cityCap(t)-t.troops));
         if(n>=1000){
           c.troops-=n;c.tired=Math.min(c.tired,c.troops);
-          const t=C(tgt);t.troops=Math.min(TROOP_CAP,t.troops+n);t.tired+=n;
+          t.troops+=n;t.tired+=n;
           state.generals.filter(g=>g.fid===fid&&g.city===cid).slice(1).forEach(g=>g.city=tgt);
         }
       }

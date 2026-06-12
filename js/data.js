@@ -283,7 +283,7 @@ const HISTORY=[
    fx:()=>{nerfCities('wei',0.86);F('wu').gold+=1000}},
   {id:'machao',y:211,s:0,title:'马超兴兵',cond:()=>F('teng').alive,
    text:'马超尽起羌胡之众，西凉铁骑十万，剽悍天下闻名。（凉州各城兵势大振）',
-   fx:()=>{cityIdsOf('teng').slice(0,2).forEach(i=>{const c=C(i);c.troops=Math.min(TROOP_CAP,c.troops+3000);c.tired+=3000})}},
+   fx:()=>{cityIdsOf('teng').slice(0,2).forEach(i=>{const c=C(i);c.troops=Math.min(cityCap(c),c.troops+3000);c.tired+=3000})}},
   {id:'locust',y:214,s:2,title:'蝗灾蔽日',cond:()=>true,
    text:'飞蝗蔽天，禾稼食尽，谷一斛五十万钱。是岁天下大饥。（各势力存粮 -30%）',
    fx:()=>{MAJORS.forEach(f=>{if(F(f).alive)F(f).food=Math.floor(F(f).food*0.7)})}},
@@ -301,7 +301,7 @@ const HISTORY=[
    fx:()=>{F('shu').gold+=800;const g=state.generals.find(g=>g.name==='诸葛亮'&&g.fid==='shu');if(g)g.war=99}},
   {id:'menghuo',y:225,s:2,title:'七擒孟获',cond:()=>F('shu').alive&&C(3).owner==='shu',
    text:'五月渡泸，深入不毛。七擒七纵，南人不复反矣。南中劲卒、青羌万骑充入蜀军。（成都 +2500 兵）',
-   fx:()=>{C(3).troops=Math.min(TROOP_CAP,C(3).troops+2500);C(3).tired+=2500}},
+   fx:()=>{C(3).troops=Math.min(cityCap(C(3)),C(3).troops+2500);C(3).tired+=2500}},
 ];
 /* ============ 抉择事件 ============ */
 const CHOICES=[
@@ -318,11 +318,11 @@ const CHOICES=[
    b:{label:'🙏 以礼相送',fx:()=>'名士飘然而去，不知所踪。'}},
   {t:'🐎 胡商献马',d:'西域胡商携良马数百匹至 {c}，皆汗血龙驹，愿售于君侯。',
    a:{label:'💰 购马练骑（600 金，+1500 兵）',cond:()=>F(state.player).gold>=600,
-      fx:(c)=>{F(state.player).gold-=600;c.troops=Math.min(TROOP_CAP,c.troops+1500);c.tired+=1500;return `${c.name}新练骑卒 1500，军容更盛！`}},
+      fx:(c)=>{F(state.player).gold-=600;c.troops=Math.min(cityCap(c),c.troops+1500);c.tired+=1500;return `${c.name}新练骑卒 1500，军容更盛！`}},
    b:{label:'婉拒之',fx:()=>'胡商驱马而去，往他乡贸易。'}},
   {t:'⛩ 祥瑞现世',d:'{c} 郊野有黄龙现于江中，五色云气聚于城楼。百姓争相传颂，以为天命所归。',
    a:{label:'📜 昭告天下（义勇来投 +1200 兵）',
-      fx:(c)=>{c.troops=Math.min(TROOP_CAP,c.troops+1200);c.tired+=1200;return `四方义士闻祥瑞来投，${c.name} 得兵 1200！`}},
+      fx:(c)=>{c.troops=Math.min(cityCap(c),c.troops+1200);c.tired+=1200;return `四方义士闻祥瑞来投，${c.name} 得兵 1200！`}},
    b:{label:'💰 设坛纳贡（+500 金）',
       fx:()=>{F(state.player).gold+=500;return '士绅纳贡称贺，府库添金 500。'}}},
   {t:'🌊 河堤告急',d:'连日暴雨，{c} 河堤将溃，万顷良田危在旦夕！',
@@ -342,7 +342,7 @@ const EVENTS=[
   {t:'💰 西域商队途经 {c}，贸易获利（+400 金）',f:(f,c)=>f.gold+=400},
   {t:'🏚 {c} 遭遇旱灾，粮草受损（-300 粮）',f:(f,c)=>f.food=Math.max(0,f.food-300)},
   {t:'🤒 {c} 爆发疫病，士卒减员',f:(f,c)=>{const d=Math.floor(c.troops*0.08);c.troops-=d;c.tired=Math.min(c.tired,c.troops);}},
-  {t:'🚩 流民来投，{c} 募得乡勇 1200',f:(f,c)=>{c.troops=Math.min(TROOP_CAP,c.troops+1200);c.tired+=1200;}},
+  {t:'🚩 流民来投，{c} 募得乡勇 1200',f:(f,c)=>{c.troops=Math.min(cityCap(c),c.troops+1200);c.tired+=1200;}},
   {t:'⚒ 能工巧匠献策，{c} 城防加固',f:(f,c)=>{if(c.wall<6)c.wall++;}},
 ];
 const DUEL_WIN=['{w} 大喝一声，刀光闪处 {l} 拨马便走，{s}军士气大振！',
