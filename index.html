@@ -598,11 +598,23 @@ function loadSave(){
 const svg=$('#map-svg');
 const NS='http://www.w3.org/2000/svg';
 let vb={x:-95,y:-110,w:1190,h:1085};
+/* 标注反向缩放（地图 App 式）：图标文字在屏幕上保持近似恒定大小 */
+const BASE_VW=1190;
+let lastK=0;
+function updateZoomScale(){
+  const k=clamp(vb.w/BASE_VW,0.45,1.35);
+  if(Math.abs(k-lastK)<0.004)return;
+  lastK=k;
+  svg.querySelectorAll('.zoomer').forEach(el=>el.setAttribute('transform',`scale(${k})`));
+  svg.querySelectorAll('.zoom-pt').forEach(el=>
+    el.setAttribute('transform',`translate(${el.dataset.zx},${el.dataset.zy}) scale(${k})`));
+}
 function applyVB(){
   svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
   svg.classList.toggle('far',vb.w>1400);   // 远观：精简为势力概览
   svg.classList.toggle('near',vb.w<700);   // 近看：内政/驻将/山名/古迹
   svg.classList.toggle('close',vb.w<430);  // 细看：风物志/渡口山道名
+  updateZoomScale();
 }
 function svgEl(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e}
 function svgText(cls,x,y,str,attrs={}){const t=svgEl('text',Object.assign({class:cls,x:x,y:y},attrs));t.textContent=str;return t}
@@ -752,16 +764,18 @@ function buildTerrain(){
     g.appendChild(svgEl('line',{class:'tree-t',x1:0,y1:3,x2:0,y2:-2}));
     svg.appendChild(g);
   });
-  // ---- 放大可见：山脉名 ----
+  // ---- 放大可见：山脉名（定点标注，屏幕恒定大小）----
   [['祁连山',175,188],['阴山',420,70],['燕山',688,64],['太行山',548,268],
    ['秦岭',300,402],['巴山',252,538],['巫山',378,572],['大别山',655,492],
    ['南岭',645,788],['武夷山',822,764],['陇山',105,356]].forEach(m=>{
-    svg.appendChild(svgText('mtn-label lod-near',m[1],m[2],m[0]));
+    const t=svgEl('text',{class:'mtn-label lod-near zoom-pt','data-zx':m[1],'data-zy':m[2],transform:`translate(${m[1]},${m[2]})`});
+    t.textContent=m[0];svg.appendChild(t);
   });
   // ---- 放大可见：古迹与古战场 ----
   [['⚔ 官渡',645,250],['⚔ 赤壁',652,628],['⚔ 夷陵',390,632],['⚔ 五丈原',338,362],
    ['◆ 铜雀台',552,182],['◆ 卧龙岗',430,470],['◆ 桃园',592,44]].forEach(l=>{
-    svg.appendChild(svgText('landmark lod-near',l[1],l[2],l[0]));
+    const t=svgEl('text',{class:'landmark lod-near zoom-pt','data-zx':l[1],'data-zy':l[2],transform:`translate(${l[1]},${l[2]})`});
+    t.textContent=l[0];svg.appendChild(t);
   });
   // ---- 舆图边框 / 罗盘 ----
   svg.appendChild(svgEl('rect',{class:'frame',x:-28,y:-38,width:1056,height:956,rx:14,'stroke-width':2.5}));
@@ -784,11 +798,15 @@ function buildMap(){
     eg.appendChild(svgEl('line',{class:'edge'+(t!=='p'?' '+t:''),x1:C(a).x,y1:C(a).y,x2:C(b).x,y2:C(b).y}));
     if(t!=='p'){
       const mx=(C(a).x+C(b).x)/2,my=(C(a).y+C(b).y)/2;
-      eg.appendChild(svgEl('circle',{class:'ebadge-bg',cx:mx,cy:my,r:9.5}));
-      const bt=svgText('ebadge',mx,my+4,ETYPE_INFO[t].icon);
+      const bg=svgEl('g',{transform:`translate(${mx},${my})`});
+      const bz=svgEl('g',{class:'zoomer'});
+      bz.appendChild(svgEl('circle',{class:'ebadge-bg',cx:0,cy:0,r:9.5}));
+      const bt=svgText('ebadge',0,4,ETYPE_INFO[t].icon);
       bt.setAttribute('fill',t==='r'?'#7fb3e8':'#c8b88a');
-      eg.appendChild(bt);
-      eg.appendChild(svgText('ebadge-label lod-close',mx,my+20,ETYPE_INFO[t].name));
+      bz.appendChild(bt);
+      bz.appendChild(svgText('ebadge-label lod-close',0,20,ETYPE_INFO[t].name));
+      bg.appendChild(bz);
+      eg.appendChild(bg);
     }
   });
   svg.appendChild(eg);
@@ -796,23 +814,26 @@ function buildMap(){
   state.cities.forEach((c,i)=>{
     const small=c.trait==='pass';
     const g=svgEl('g',{class:'city'+(small?' small':''),'data-id':i,transform:`translate(${c.x},${c.y})`});
-    g.appendChild(svgEl('circle',{class:'ring',r:small?26:34}));
-    if(c.cap)g.appendChild(svgEl('circle',{class:'capring',r:29}));
-    g.appendChild(svgEl('circle',{class:'body',r:small?17:24}));
-    g.appendChild(svgEl('circle',{r:small?17:24,fill:'url(#shine)','pointer-events':'none'}));
-    const fch=svgEl('text',{class:'fch',y:small?5:7});g.appendChild(fch);
-    const ti=svgEl('text',{class:'ticon',y:small?-24:-32});ti.textContent=TRAITS[c.trait].icon;g.appendChild(ti);
-    const nm=svgEl('text',{class:'name'+(c.cap?' cap':''),y:small?34:46});nm.textContent=(c.cap?'★':'')+c.name;g.appendChild(nm);
-    const tr=svgEl('text',{class:'troops',y:small?48:63});g.appendChild(tr);
+    const z=svgEl('g',{class:'zoomer'}); // 反向缩放层：屏幕恒定大小
+    z.appendChild(svgEl('circle',{class:'ring',r:small?26:34}));
+    if(c.cap)z.appendChild(svgEl('circle',{class:'capring',r:29}));
+    z.appendChild(svgEl('circle',{class:'body',r:small?17:24}));
+    z.appendChild(svgEl('circle',{r:small?17:24,fill:'url(#shine)','pointer-events':'none'}));
+    const fch=svgEl('text',{class:'fch',y:small?5:7});z.appendChild(fch);
+    const ti=svgEl('text',{class:'ticon',y:small?-24:-32});ti.textContent=TRAITS[c.trait].icon;z.appendChild(ti);
+    const nm=svgEl('text',{class:'name'+(c.cap?' cap':''),y:small?34:46});nm.textContent=(c.cap?'★':'')+c.name;z.appendChild(nm);
+    const tr=svgEl('text',{class:'troops',y:small?48:63});z.appendChild(tr);
     // 放大可见：内政 / 驻将 / 风物志
-    g.appendChild(svgEl('text',{class:'cstats lod-near',y:small?61:77}));
-    g.appendChild(svgEl('text',{class:'gline lod-near',y:small?74:91}));
+    z.appendChild(svgEl('text',{class:'cstats lod-near',y:small?61:77}));
+    z.appendChild(svgEl('text',{class:'gline lod-near',y:small?74:91}));
     const tg=svgEl('text',{class:'ctag lod-close',y:small?87:105});
-    tg.textContent='『'+c.tag.split('，')[0]+'』';g.appendChild(tg);
+    tg.textContent='『'+c.tag.split('，')[0]+'』';z.appendChild(tg);
+    g.appendChild(z);
     svg.appendChild(g);
   });
   // 行军动画层
   svg.appendChild(svgEl('g',{id:'fx-layer'}));
+  lastK=0;updateZoomScale(); // 节点重建后重算标注缩放
   renderMap();
 }
 function renderMap(){
