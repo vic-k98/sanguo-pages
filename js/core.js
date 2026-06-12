@@ -13,7 +13,7 @@ const store={
   set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},
   del(k){try{localStorage.removeItem(k)}catch(e){}}
 };
-const SAVE_KEY='sgbh_save_v7';
+const SAVE_KEY='sgbh_save_v8';
 
 /* ============ 音效 ============ */
 const Sound={
@@ -53,7 +53,7 @@ let state=null,selected=-1,busy=false;
 function newGame(playerFid,diff,opts){
   opts=Object.assign({wealth:1,hist:true,neu:1},opts||{});
   state={
-    v:7,player:playerFid,diff:diff,turn:1,year:200,season:0,won:false,fired:[],opts:opts,
+    v:8,player:playerFid,diff:diff,turn:1,year:200,season:0,won:false,fired:[],opts:opts,
     factions:{},log:[],
     cities:CITY_DEFS.map(d=>({name:d[0],x:d[1],y:d[2],owner:d[3],
       troops:d[3]==='neutral'?Math.round(d[4]*opts.neu):d[4],
@@ -128,7 +128,7 @@ function save(){
 function loadSave(){
   const s=store.get(SAVE_KEY);
   if(!s)return false;
-  try{const o=JSON.parse(s);if(o&&o.v===7&&o.cities&&o.cities.length===CITY_DEFS.length){state=o;return true}}catch(e){}
+  try{const o=JSON.parse(s);if(o&&o.v===8&&o.cities&&o.cities.length===CITY_DEFS.length){state=o;return true}}catch(e){}
   return false;
 }
 

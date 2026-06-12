@@ -5,16 +5,16 @@
 const svg=$('#map-svg');
 const NS='http://www.w3.org/2000/svg';
 let cityRefs=[],cellRefs=[];
-let vb={x:70,y:-10,w:860,h:784};
+let vb={x:30,y:-30,w:920,h:839};
 const BASE_VW=1000;
-const MINW=230,MAXW=980;
-const PAN_BOX={x:-60,y:-110,x2:1020,y2:850};
+const MINW=230,MAXW=1070;
+const PAN_BOX={x:-60,y:-110,x2:1020,y2:960};
 let lastK=0;
 let zoomerEls=[],zoomPtEls=[];
 
 /* ---- 势力范围：维诺图 + 海岸裁剪 ---- */
-const LAND_CLIP=[[30,18],[300,0],[620,0],[830,26],[858,80],[874,228],[914,342],[902,470],
-  [950,588],[926,792],[858,838],[600,812],[300,788],[110,726],[26,560],[12,256]];
+const LAND_CLIP=[[30,18],[300,0],[620,0],[830,8],[940,4],[948,62],[900,120],[874,228],[914,342],[902,470],
+  [950,588],[926,792],[880,856],[640,896],[500,940],[330,900],[140,800],[26,560],[12,256]];
 function clipHalf(poly,nx,ny,mx,my){
   const out=[];
   for(let k=0;k<poly.length;k++){
@@ -57,7 +57,7 @@ function clampVB(){
 }
 function applyVB(){
   svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
-  svg.classList.toggle('far',vb.w>885);
+  svg.classList.toggle('far',vb.w>955);
   svg.classList.toggle('near',vb.w<620);
   svg.classList.toggle('close',vb.w<400);
   updateZoomScale();
@@ -133,10 +133,14 @@ function buildTerrain(){
   svg.appendChild(svgText('outer-label',330,1070,'南 中 · 百 越',{'font-size':'26',fill:'#7fa382'}));
   svg.appendChild(svgText('outer-sub',330,1098,'瘴疠丛林 · 不毛之地',{'font-size':'13',fill:'#6f9372'}));
   svg.appendChild(svgEl('path',{class:'sea',d:
-    'M 845,-80 C 838,5 902,55 932,105 C 960,150 898,190 872,228 '+
+    'M 952,-80 C 944,-20 956,40 938,82 C 918,128 884,170 872,228 '+
     'C 850,262 900,295 912,340 C 925,395 885,430 900,468 '+
     'C 912,515 958,535 948,585 C 938,655 962,715 925,790 '+
-    'C 905,838 932,880 952,935 C 962,990 940,1060 955,1130 L 955,4600 L 5000,4600 L 5000,-3000 L 845,-3000 Z'}));
+    'C 908,832 920,862 880,880 C 800,916 700,912 620,930 C 540,948 480,985 420,960 '+
+    'C 380,944 390,990 410,1060 L 410,4600 L 5000,4600 L 5000,-3000 L 952,-3000 Z'}));
+  // 渤海湾（辽东半岛与山东半岛之间的内海）
+  svg.appendChild(svgEl('path',{class:'sea',d:
+    'M 838,52 C 852,80 866,108 858,140 C 850,172 862,196 880,206 C 905,218 922,190 928,160 C 935,122 920,90 900,72 C 880,55 855,42 838,52 Z'}));
   [[930,160],[955,300],[942,430],[975,520],[935,665],[968,740],[915,60],[990,880],[1060,400],[1100,640]].forEach(p=>{
     svg.appendChild(svgEl('path',{class:'wave',d:`M ${p[0]},${p[1]} q 11,-7 22,0 q 11,7 22,0`}));
   });
@@ -175,7 +179,7 @@ function buildTerrain(){
   });
   [['祁连山',175,188],['阴山',420,70],['燕山',688,64],['太行山',548,268],
    ['秦岭',300,402],['巴山',252,538],['巫山',378,572],['大别山',655,492],
-   ['南岭',645,788],['武夷山',822,764],['陇山',105,356]].forEach(m=>{
+   ['南岭',560,832],['武夷山',822,764],['陇山',105,356],['祁山',238,420],['千山',892,104]].forEach(m=>{
     const t=svgEl('text',{class:'mtn-label lod-near zoom-pt','data-zx':m[1],'data-zy':m[2],transform:`translate(${m[1]},${m[2]})`});
     t.textContent=m[0];svg.appendChild(t);
   });
@@ -194,7 +198,9 @@ function buildTerrain(){
     [302,378,4,1.05],[238,470,3,1],[205,508,3,.9],
     [380,548,3,.85],[372,592,2,.75],[655,468,3,.85],
     [645,762,4,.95],[822,740,3,.85],[105,330,3,.9],
-    [62,118,2,.85],[148,256,2,.8]
+    [62,118,2,.85],[148,256,2,.8],
+    [240,398,2,.8],[500,802,3,.9],[572,810,3,.85],[680,815,2,.8], // 祁山 / 五岭
+    [890,84,2,.7],[320,470,2,.8]                                   // 千山 / 大巴山
   ];
   MTNS.forEach(m=>{
     const g=svgEl('g',{transform:`translate(${m[0]},${m[1]}) scale(${m[3]})`});
@@ -206,18 +212,28 @@ function buildTerrain(){
     }
     svg.appendChild(g);
   });
-  const huanghe='M 30,128 C 130,158 200,128 250,168 C 305,212 380,238 540,250 C 660,259 780,262 905,345';
+  // 黄河：九曲几字弯 → 潼关东折 → 入渤海
+  const huanghe='M 28,212 C 78,170 108,98 168,62 C 232,26 322,18 356,58 '+
+    'C 388,98 376,178 396,236 C 410,274 444,290 472,302 '+
+    'C 528,318 588,278 656,264 C 740,248 812,278 878,330';
   const changjiang='M 118,478 C 200,520 268,588 360,622 C 450,656 540,640 622,610 C 720,575 850,540 945,492';
-  const weishui='M 142,312 C 230,322 330,308 458,318';
+  const weishui='M 142,318 C 230,326 340,310 466,302';
   const hanshui='M 298,452 C 392,470 462,498 482,508 C 530,528 560,528 596,528';
-  svg.appendChild(svgEl('path',{class:'river-c',d:weishui,opacity:.45}));
-  svg.appendChild(svgEl('path',{class:'river-c',d:hanshui,opacity:.45}));
+  const huaihe='M 600,442 C 658,434 700,424 742,440 C 792,458 850,460 900,470';
+  const xiangjiang='M 592,768 C 576,732 558,700 540,664';
+  const ganjiang='M 700,758 C 694,706 688,650 670,620';
+  const zhujiang='M 360,892 C 440,906 520,898 600,908';
+  [[xiangjiang,.4],[ganjiang,.4],[zhujiang,.45],[weishui,.45],[hanshui,.45],[huaihe,.55]].forEach(r=>{
+    svg.appendChild(svgEl('path',{class:'river-c',d:r[0],opacity:r[1]}));
+  });
   svg.appendChild(svgEl('path',{class:'river-w',d:huanghe}));
   svg.appendChild(svgEl('path',{class:'river-c',d:huanghe}));
   svg.appendChild(svgEl('path',{class:'river-w',d:changjiang}));
   svg.appendChild(svgEl('path',{class:'river-c',d:changjiang}));
-  const hl=svgText('river-label',210,128,'黄 河');hl.setAttribute('transform','rotate(9 210 128)');svg.appendChild(hl);
+  const hl=svgText('river-label',258,38,'黄 河');hl.setAttribute('transform','rotate(-12 258 38)');svg.appendChild(hl);
   const cl=svgText('river-label',520,675,'长 江');cl.setAttribute('transform','rotate(-7 520 675)');svg.appendChild(cl);
+  svg.appendChild(svgText('lake-label',822,442,'淮河'));
+  svg.appendChild(svgText('lake-label',560,925,'珠江'));
   svg.appendChild(svgText('lake-label',300,295,'渭水'));
   svg.appendChild(svgText('lake-label',412,476,'汉水'));
   svg.appendChild(svgEl('ellipse',{class:'lake',cx:496,cy:644,rx:24,ry:13}));
@@ -246,9 +262,19 @@ function buildMap(){
   buildTerrain();
   cellRefs=[];
   const cellG=svgEl('g',{});
+  // 中点二次贝塞尔平滑：疆界圆润如水墨晕染
+  const smoothPath=pts=>{
+    const n=pts.length;
+    let d='M '+((pts[0][0]+pts[n-1][0])/2).toFixed(1)+','+((pts[0][1]+pts[n-1][1])/2).toFixed(1);
+    for(let i=0;i<n;i++){
+      const p=pts[i],q=pts[(i+1)%n];
+      d+=` Q ${p[0].toFixed(1)},${p[1].toFixed(1)} ${((p[0]+q[0])/2).toFixed(1)},${((p[1]+q[1])/2).toFixed(1)}`;
+    }
+    return d+' Z';
+  };
   computeCells().forEach((poly,i)=>{
     if(poly.length<3){cellRefs.push(null);return;}
-    const p=svgEl('path',{class:'tcell',d:'M '+poly.map(pt=>pt[0].toFixed(1)+','+pt[1].toFixed(1)).join(' L ')+' Z'});
+    const p=svgEl('path',{class:'tcell',d:smoothPath(poly)});
     cellG.appendChild(p);cellRefs.push(p);
   });
   svg.appendChild(cellG);
@@ -287,12 +313,14 @@ function buildMap(){
     const tr=svgEl('text',{class:'troops',y:small?48:63});z.appendChild(tr);
     z.appendChild(svgEl('text',{class:'cstats lod-near',y:small?61:77}));
     z.appendChild(svgEl('text',{class:'gline lod-near',y:small?74:91}));
-    const tg=svgEl('text',{class:'ctag lod-close',y:small?87:105});
+    z.appendChild(svgEl('text',{class:'cincome lod-close',y:small?87:105}));
+    const tg=svgEl('text',{class:'ctag lod-close',y:small?100:119});
     tg.textContent='『'+c.tag.split('，')[0]+'』';z.appendChild(tg);
     g.appendChild(z);
     svg.appendChild(g);
     cityRefs.push({g,body:z.querySelector('.body'),fch,troops:tr,
-      cstats:z.querySelector('.cstats'),gline:z.querySelector('.gline')});
+      cstats:z.querySelector('.cstats'),gline:z.querySelector('.gline'),
+      cincome:z.querySelector('.cincome')});
   });
   svg.appendChild(svgEl('g',{id:'fx-layer'}));
   zoomerEls=[...svg.querySelectorAll('.zoomer')];
@@ -314,6 +342,9 @@ function renderMap(){
     r.fch.textContent=FACTS[c.owner].name;
     r.troops.textContent=fmtT(c.troops);
     r.cstats.textContent=`农${c.farm} 商${c.comm} 防${c.wall}`;
+    const gIn=(GOLD_BASE+c.comm*GOLD_PER_COMM)*(c.trait==='trade'?1.4:1)*(hasSkillIn(i,'shang')?1.2:1);
+    const fIn=c.farm*FOOD_PER_FARM*(c.trait==='gran'?1.4:1)*(hasSkillIn(i,'tun')?1.2:1);
+    r.cincome.textContent=`岁入 ${Math.round(gIn)}金 ${Math.round(fIn)}粮`;
     const gg=generalsIn(i);
     r.gline.textContent=gg.length?gg.slice(0,3).map(x=>x.name).join(' ')+(gg.length>3?` 等${gg.length}将`:''):'';
     r.g.classList.remove('sel','atk','mov');
@@ -414,7 +445,13 @@ function animateMarch(from,to,color,cb){
     if(was===1&&moved<12&&performance.now()-downT<600){
       const g=e.target.closest&&e.target.closest('g.city');
       if(busy)return;
-      if(g)select(+g.dataset.id);
+      if(g){
+        const id=+g.dataset.id;
+        // 已选己方城时点其相邻城 → 直接进入出兵（少一步导航）
+        if(selected>=0&&selected!==id&&C(selected).owner===state.player&&ADJ[selected].includes(id)){
+          openArmyModal(selected,id);
+        }else select(id);
+      }
       else deselect();
     }
   }

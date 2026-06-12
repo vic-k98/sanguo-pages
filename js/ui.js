@@ -84,19 +84,29 @@ function renderPanel(){
       <button class="btn" data-act="dev-comm" ${used||c.comm>=mC||f.gold<dC?'disabled':''}>💰 通商<small>${c.comm>=mC?'已满级':dC+'金'}</small></button>
       <button class="btn" data-act="dev-wall" ${used||c.wall>=mW||f.gold<dW?'disabled':''}>🛡 筑城<small>${c.wall>=mW?'已满级':dW+'金'}</small></button>
     </div>
-    <button class="btn gold wide" data-act="recruit" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
-      <span>⚔️ 征兵${rm<1?' <small style="color:#9ae6a8">優惠</small>':''}</span><small>${c.recUsed?'本回合已征募':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
-    </button>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn gold" style="flex:2.2;flex-direction:row;justify-content:space-between;padding:12px 14px" data-act="recruit" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
+        <span>⚔️ 征兵</span><small>${c.recUsed?'已征募':`${(RG*rm).toFixed(2)}金+${(RF*rm).toFixed(2)}粮/人`}</small>
+      </button>
+      <button class="btn gold" style="flex:1;flex-direction:row;padding:12px 6px" data-act="qrec" ${c.recUsed||c.troops>=TROOP_CAP?'disabled':''}>
+        <span>⚡速征</span>
+      </button>
+    </div>
     <div class="sec-title">出 兵（可战 ${fmtT(fresh)}）${state.season===3?'<span style="color:#7fb3e8">❄️ 冬季出征 -10%</span>':''}</div>`;
     ADJ[selected].forEach(n=>{
       const tc=C(n),hostile=tc.owner!==state.player;
       const dg=generalsIn(n);
       const et=edgeType(selected,n);
       const eTag=et!=='p'?` · ${ETYPE_INFO[et].icon}${ETYPE_INFO[et].name}`:'';
-      html+=`<button class="btn wide ${hostile?'atk':'mov'}" data-act="army:${n}" ${fresh<500?'disabled':''}>
-        <span>${hostile?'⚔️ 进攻':'🚚 调动'} → ${tc.name}</span>
-        <small>${FACTS[tc.owner].name}军 ${fmtT(tc.troops)}${hostile?` · 城防${tc.wall}${tc.trait==='fort'?'·雄关':''}${dg.length?' · '+leadName(dg)+'守':''}`:''}${eTag}</small>
-      </button>`;
+      html+=`<div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn ${hostile?'atk':'mov'}" style="flex:1;flex-direction:row;justify-content:space-between;padding:12px 12px" data-act="army:${n}" ${fresh<500?'disabled':''}>
+          <span>${hostile?'⚔️ 进攻':'🚚 调动'} → ${tc.name}</span>
+          <small>${FACTS[tc.owner].name}军 ${fmtT(tc.troops)}${hostile?` · 防${tc.wall}${dg.length?' · '+leadName(dg):''}`:''}${eTag}</small>
+        </button>
+        <button class="btn ${hostile?'atk':'mov'}" style="flex:none;flex-direction:row;padding:12px 9px" data-act="quick:${n}" ${fresh<500?'disabled':''} title="${hostile?'全军即刻出击':'移防一半兵力'}">
+          <span>⚡</span>
+        </button>
+      </div>`;
     });
     if(fresh<500)html+=`<div class="dim" style="font-size:12px;margin-top:6px">可战之兵不足 500，无法出兵（新兵需休整一回合）</div>`;
   }else{
@@ -134,6 +144,8 @@ $('#panel').addEventListener('click',e=>{
   Sound.play('tap');
   if(act==='close')return deselect();
   if(act==='recruit')return openRecruitModal(selected);
+  if(act==='qrec')return doQuickRecruit(selected);
+  if(act.startsWith('quick:'))return doQuickArmy(selected,+act.slice(6));
   if(act.startsWith('strat-'))return doStrat(selected,act.slice(6));
   if(act.startsWith('dev-'))return doDev(selected,act.slice(4));
   if(act.startsWith('army:'))return openArmyModal(selected,+act.slice(5));
@@ -195,6 +207,41 @@ function openRecruitModal(cid){
     toast(`⚔️ ${c.name} 征募 ${n.toLocaleString()} 名新兵`);
     closeModal();renderAll();save();
   };
+}
+/* ---- 无弹窗快捷操作 ---- */
+function doQuickRecruit(cid){
+  const c=C(cid),f=F(state.player);
+  if(c.recUsed)return;
+  const rm=recruitMult(c),rg=RG*rm,rf=RF*rm;
+  const n=Math.min(2000,RECRUIT_CAP,TROOP_CAP-c.troops,Math.floor(f.gold/rg/100)*100,Math.floor(f.food/rf/100)*100);
+  if(n<100){toast('💰 金钱或粮草不足');return;}
+  f.gold-=n*rg;f.food-=n*rf;
+  c.troops+=n;c.tired+=n;c.recUsed=true;
+  Sound.play('coin');
+  toast(`⚡ ${c.name} 速征 ${n.toLocaleString()} 兵`);addLog(`${c.name} 速征 ${n} 兵`);
+  renderAll();save();
+}
+function doQuickArmy(from,to){
+  const A=C(from),B=C(to);
+  const hostile=B.owner!==state.player;
+  const fresh=A.troops-A.tired;
+  if(fresh<500){toast('可战之兵不足');return;}
+  const n=hostile?fresh:Math.max(500,Math.floor(fresh/2/100)*100);
+  const gsel=hostile?generalsIn(from).map(g=>g.id):[];
+  busy=true;deselectKeepPanel();
+  animateMarch(from,to,FACTS[state.player].color,()=>{
+    if(hostile){
+      const r=doBattle(from,to,n,gsel);
+      renderAll();save();
+      showBattleModal(r);
+      busy=false;
+    }else{
+      doTransfer(from,to,n,gsel);
+      toast(`🚚 ${n.toLocaleString()} 兵移驻 ${B.name}`);
+      busy=false;
+      select(to);renderAll();save();
+    }
+  });
 }
 /* ---- 出兵 ---- */
 function openArmyModal(from,to){

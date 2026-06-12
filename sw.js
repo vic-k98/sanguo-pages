@@ -1,6 +1,6 @@
 // 三国·烽火天下 离线缓存
 // 策略：HTML 联网优先（在线即更新，离线用缓存）；静态资源缓存优先
-const CACHE = 'sgbh-v3';
+const CACHE = 'sgbh-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.png',
   './css/style.css',
   './js/data.js', './js/core.js', './js/map.js', './js/ui.js', './js/ai.js', './js/main.js'];

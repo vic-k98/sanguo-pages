@@ -312,3 +312,7 @@ body.light .frame{stroke:#9a8e72}
 #turn-overlay.show{display:flex}
 #turn-overlay .inner{animation:breathe 1.2s infinite}
 @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+/* v8：放大细节与圆润疆界 */
+.cincome{font-size:10px;fill:#a8c29a;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:2.5}
+body.light .cincome{fill:#5a7048;stroke:#f0ead7}
+.tcell{stroke-linejoin:round;stroke-linecap:round}
