@@ -96,6 +96,17 @@ button{font-family:inherit}
 .snowcap{fill:#c8d4e8;opacity:.8}
 .tree-c{fill:#2e4a34;stroke:#4a6a50;stroke-width:1;opacity:.8}
 .tree-t{stroke:#4a5a40;stroke-width:1.6;opacity:.7}
+/* 分级细节：放大显示更多 */
+.lod-near,.lod-close{opacity:0;transition:opacity .3s;pointer-events:none}
+svg.near .lod-near{opacity:1}
+svg.close .lod-close{opacity:1}
+svg.far .troops,svg.far .ticon{opacity:0;transition:opacity .3s}
+.cstats{font-size:10.5px;fill:#93a8c2;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:3}
+.gline{font-size:10.5px;fill:#cdbce8;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:3}
+.ctag{font-size:10px;fill:#b9a978;text-anchor:middle;font-family:"Songti SC","KaiTi",serif;paint-order:stroke;stroke:#0b1018;stroke-width:2.5}
+.mtn-label{font-size:12.5px;fill:rgba(138,151,173,.8);text-anchor:middle;font-family:"Songti SC","KaiTi",serif;letter-spacing:2px}
+.landmark{font-size:11.5px;fill:rgba(200,168,106,.88);text-anchor:middle;font-family:"Songti SC","KaiTi",serif;paint-order:stroke;stroke:#0b1018;stroke-width:2.5}
+.ebadge-label{font-size:9px;fill:#8fa3c4;text-anchor:middle;paint-order:stroke;stroke:#0b1018;stroke-width:2}
 .river-w{fill:none;stroke:#1d3a5c;stroke-width:13;opacity:.85;stroke-linecap:round}
 .river-c{fill:none;stroke:#3a679a;stroke-width:3.5;opacity:.6;stroke-linecap:round}
 .river-label{font-family:"Songti SC","STKaiti","KaiTi",serif;fill:#6f9cc9;opacity:.7;font-size:17px;letter-spacing:5px}
@@ -587,7 +598,12 @@ function loadSave(){
 const svg=$('#map-svg');
 const NS='http://www.w3.org/2000/svg';
 let vb={x:-95,y:-110,w:1190,h:1085};
-function applyVB(){svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)}
+function applyVB(){
+  svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  svg.classList.toggle('far',vb.w>1400);   // 远观：精简为势力概览
+  svg.classList.toggle('near',vb.w<700);   // 近看：内政/驻将/山名/古迹
+  svg.classList.toggle('close',vb.w<430);  // 细看：风物志/渡口山道名
+}
 function svgEl(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e}
 function svgText(cls,x,y,str,attrs={}){const t=svgEl('text',Object.assign({class:cls,x:x,y:y},attrs));t.textContent=str;return t}
 
@@ -736,6 +752,17 @@ function buildTerrain(){
     g.appendChild(svgEl('line',{class:'tree-t',x1:0,y1:3,x2:0,y2:-2}));
     svg.appendChild(g);
   });
+  // ---- 放大可见：山脉名 ----
+  [['祁连山',175,188],['阴山',420,70],['燕山',688,64],['太行山',548,268],
+   ['秦岭',300,402],['巴山',252,538],['巫山',378,572],['大别山',655,492],
+   ['南岭',645,788],['武夷山',822,764],['陇山',105,356]].forEach(m=>{
+    svg.appendChild(svgText('mtn-label lod-near',m[1],m[2],m[0]));
+  });
+  // ---- 放大可见：古迹与古战场 ----
+  [['⚔ 官渡',645,250],['⚔ 赤壁',652,628],['⚔ 夷陵',390,632],['⚔ 五丈原',338,362],
+   ['◆ 铜雀台',552,182],['◆ 卧龙岗',430,470],['◆ 桃园',592,44]].forEach(l=>{
+    svg.appendChild(svgText('landmark lod-near',l[1],l[2],l[0]));
+  });
   // ---- 舆图边框 / 罗盘 ----
   svg.appendChild(svgEl('rect',{class:'frame',x:-28,y:-38,width:1056,height:956,rx:14,'stroke-width':2.5}));
   svg.appendChild(svgEl('rect',{class:'frame',x:-21,y:-31,width:1042,height:942,rx:10,'stroke-width':1,opacity:.5}));
@@ -761,6 +788,7 @@ function buildMap(){
       const bt=svgText('ebadge',mx,my+4,ETYPE_INFO[t].icon);
       bt.setAttribute('fill',t==='r'?'#7fb3e8':'#c8b88a');
       eg.appendChild(bt);
+      eg.appendChild(svgText('ebadge-label lod-close',mx,my+20,ETYPE_INFO[t].name));
     }
   });
   svg.appendChild(eg);
@@ -776,6 +804,11 @@ function buildMap(){
     const ti=svgEl('text',{class:'ticon',y:small?-24:-32});ti.textContent=TRAITS[c.trait].icon;g.appendChild(ti);
     const nm=svgEl('text',{class:'name'+(c.cap?' cap':''),y:small?34:46});nm.textContent=(c.cap?'★':'')+c.name;g.appendChild(nm);
     const tr=svgEl('text',{class:'troops',y:small?48:63});g.appendChild(tr);
+    // 放大可见：内政 / 驻将 / 风物志
+    g.appendChild(svgEl('text',{class:'cstats lod-near',y:small?61:77}));
+    g.appendChild(svgEl('text',{class:'gline lod-near',y:small?74:91}));
+    const tg=svgEl('text',{class:'ctag lod-close',y:small?87:105});
+    tg.textContent='『'+c.tag.split('，')[0]+'』';g.appendChild(tg);
     svg.appendChild(g);
   });
   // 行军动画层
@@ -790,6 +823,9 @@ function renderMap(){
     g.querySelector('.body').setAttribute('fill',FACTS[c.owner].color);
     g.querySelector('.fch').textContent=FACTS[c.owner].name;
     g.querySelector('.troops').textContent=fmtT(c.troops);
+    g.querySelector('.cstats').textContent=`农${c.farm} 商${c.comm} 防${c.wall}`;
+    const gg=generalsIn(i);
+    g.querySelector('.gline').textContent=gg.length?gg.slice(0,3).map(x=>x.name).join(' ')+(gg.length>3?` 等${gg.length}将`:''):'';
     g.classList.remove('sel','atk','mov');
   });
   if(selected>=0){
@@ -1506,7 +1542,7 @@ function showHelp(){
   <b>📜 史话</b>：官渡、赤壁、三顾茅庐……历史会如期上演，影响天下大势。<br>
   <b>🎲 际遇</b>：贼寇、名士、祥瑞、河患……不时需要君侯亲自抉择。<br>
   <b>🌾 粮草</b>：士兵消耗军粮，缺粮则士卒逃散，穷兵黩武不可取。<br>
-  <b>🗺 操作</b>：拖动平移地图，双指捏合/滚轮缩放，点击城池查看详情。<br>
+  <b>🗺 操作</b>：拖动平移地图，双指捏合/滚轮缩放，点击城池查看详情。<b>放大</b>可见各城内政、驻将、山脉名与官渡/赤壁等古迹；缩到最远则为势力概览。<br>
   <b>💾 存档</b>：每个操作即时自动保存，刷新/关闭页面随时回来继续；想重开请点右上 ☰ → 重新开始。</div>
   <div class="row"><button class="btn primary" onclick="closeModal()">明白了</button></div>`);
 }
